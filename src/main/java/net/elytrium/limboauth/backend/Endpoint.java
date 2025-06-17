@@ -46,7 +46,9 @@ public abstract class Endpoint {
       return;
     }
 
-    output.writeInt(1);
+    // Use protocol version 0 for replies as expected by the client
+    // otherwise Endpoint#read will reject the packet
+    output.writeInt(0);
     output.writeUTF(Settings.IMP.MAIN.BACKEND_API.TOKEN);
     output.writeUTF(this.username);
     this.writeContents(output);
