@@ -90,7 +90,7 @@ public class AuthListener {
 
                 // As Velocity doesnt have any events for our usecase, just inject into netty
                 connection.getChannel().closeFuture().addListener(future -> {
-                  // Player has failed premium verfication client-side, mark as offline-mode
+                  // Player has failed premium verification client-side, mark as offline-mode
                   if (this.plugin.getPendingLogins().remove(username)) {
                     this.plugin.setPremiumCacheLowercased(username.toLowerCase(Locale.ROOT), false);
                   }
