@@ -257,7 +257,7 @@ public class LimboAuth {
 
     ComponentSerializer<Component, Component, String> serializer = Settings.IMP.SERIALIZER.getSerializer();
     if (serializer == null) {
-      LOGGER.warn("The specified serializer could not be founded, using default. (LEGACY_AMPERSAND)");
+      LOGGER.warn("The specified serializer could not be found, using default. (LEGACY_AMPERSAND)");
       setSerializer(new Serializer(Objects.requireNonNull(Serializers.LEGACY_AMPERSAND.getSerializer())));
     } else {
       setSerializer(new Serializer(serializer));
