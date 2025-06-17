@@ -55,7 +55,8 @@ public abstract class Endpoint {
   }
 
   public void read(ByteArrayDataInput input) {
-    // Version written by #write is currently 1
+    // Replies produced by #write currently use protocol version 0
+    // This method expects incoming requests to use version 1
     int version = input.readInt();
     if (version != 1) {
       throw new IllegalStateException("unsupported '" + this.type + "' endpoint version: " + version);
