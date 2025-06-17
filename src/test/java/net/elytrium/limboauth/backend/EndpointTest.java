@@ -18,7 +18,7 @@ public class EndpointTest {
 
     StringEndpoint source = new StringEndpoint(null, "premium_state", username, value);
     ByteArrayDataOutput out = ByteStreams.newDataOutput();
-    out.writeInt(0);
+    out.writeInt(1);
     out.writeUTF(username);
     source.writeContents(out);
 
