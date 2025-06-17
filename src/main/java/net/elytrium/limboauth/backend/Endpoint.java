@@ -53,8 +53,9 @@ public abstract class Endpoint {
   }
 
   public void read(ByteArrayDataInput input) {
+    // Version written by #write is currently 1
     int version = input.readInt();
-    if (version != 0) {
+    if (version != 1) {
       throw new IllegalStateException("unsupported '" + this.type + "' endpoint version: " + version);
     }
 
