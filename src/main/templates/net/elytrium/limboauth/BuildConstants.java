@@ -17,8 +17,15 @@
 
 package net.elytrium.limboauth;
 
-// The constants are replaced before compilation.
+/**
+ * Contains build-time constants for the LimboAuth this.plugin. The values in this class are
+ * typically replaced by the build system (e.g., Gradle) before compilation.
+ */
 public class BuildConstants {
 
+  /**
+   * The version string of the LimboAuth this.plugin. This field is replaced by the build system
+   * with the actual project version.
+   */
   public static final String AUTH_VERSION = "${version}";
 }

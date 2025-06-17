@@ -1,32 +1,29 @@
-/*
- * Copyright (C) 2021 - 2025 Elytrium
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
 package net.elytrium.limboauth.dependencies;
 
 import java.net.URL;
 import java.net.URLClassLoader;
 
+/**
+ * A custom {@link URLClassLoader} designed to load classes in isolation. It prioritizes loading
+ * from its own URLs before delegating to the parent classloader, effectively isolating the loaded
+ * classes from the main application's classpath. This is particularly useful for managing different
+ * versions of libraries or JDBC drivers.
+ */
 public class IsolatedClassLoader extends URLClassLoader {
 
+  /**
+   * Constructs an IsolatedClassLoader with the specified URLs and a parent classloader set to the
+   * system classloader's parent (usually the bootstrap classloader), promoting isolation.
+   *
+   * @param urls The URLs from which to load classes and resources.
+   */
+  /** Default constructor. */
   public IsolatedClassLoader(URL[] urls) {
     super(urls, ClassLoader.getSystemClassLoader().getParent());
   }
 
   static {
+    // Enables parallel class loading capabilities if supported by the JVM.
     ClassLoader.registerAsParallelCapable();
   }
 }

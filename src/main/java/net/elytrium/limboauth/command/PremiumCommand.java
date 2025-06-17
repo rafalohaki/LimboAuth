@@ -1,109 +1,150 @@
-/*
- * Copyright (C) 2021 - 2025 Elytrium
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
 package net.elytrium.limboauth.command;
 
-import com.j256.ormlite.dao.Dao;
 import com.velocitypowered.api.command.CommandSource;
 import com.velocitypowered.api.command.SimpleCommand;
 import com.velocitypowered.api.proxy.Player;
-import java.sql.SQLException;
 import java.util.Locale;
 import net.elytrium.commons.kyori.serialization.Serializer;
 import net.elytrium.limboauth.LimboAuth;
 import net.elytrium.limboauth.Settings;
-import net.elytrium.limboauth.handler.AuthSessionHandler;
 import net.elytrium.limboauth.model.RegisteredPlayer;
 import net.elytrium.limboauth.model.SQLRuntimeException;
+import net.elytrium.limboauth.service.AuthenticationService;
+import net.elytrium.limboauth.service.CacheManager;
+import net.elytrium.limboauth.service.ConfigManager;
+import net.elytrium.limboauth.service.DatabaseService;
 import net.kyori.adventure.text.Component;
+import org.slf4j.Logger;
 
+/**
+ * Command for players to mark their account as "premium". This typically involves verifying their
+ * username against Mojang's API and, if successful, clearing their password hash in the database,
+ * effectively making their account online-mode only for this server's authentication system.
+ */
 public class PremiumCommand extends RatelimitedCommand {
 
-  private final LimboAuth plugin;
-  private final Dao<RegisteredPlayer, String> playerDao;
+  private final Logger logger;
+  private final DatabaseService databaseService;
+  private final AuthenticationService authenticationService;
+  private final CacheManager cacheManager;
+  private final LimboAuth plugin; // For disconnecting player
 
-  private final String confirmKeyword;
-  private final Component notRegistered;
-  private final Component alreadyPremium;
-  private final Component successful;
-  private final Component errorOccurred;
-  private final Component notPremium;
-  private final Component wrongPassword;
-  private final Component usage;
-  private final Component notPlayer;
-
-  public PremiumCommand(LimboAuth plugin, Dao<RegisteredPlayer, String> playerDao) {
+  /**
+   * Constructs the PremiumCommand.
+   *
+   * @param plugin The main LimboAuth plugin instance.
+   * @param databaseService Service for database interactions.
+   * @param authenticationService Service for authentication logic, including premium checks.
+   * @param cacheManager Service for managing caches.
+   * @param configManager Service for accessing configuration.
+   */
+  public PremiumCommand(
+      LimboAuth plugin,
+      DatabaseService databaseService,
+      AuthenticationService authenticationService,
+      CacheManager cacheManager,
+      ConfigManager configManager) {
+    super(configManager);
     this.plugin = plugin;
-    this.playerDao = playerDao;
-
-    Serializer serializer = LimboAuth.getSerializer();
-    this.confirmKeyword = Settings.IMP.MAIN.CONFIRM_KEYWORD;
-    this.notRegistered = serializer.deserialize(Settings.IMP.MAIN.STRINGS.NOT_REGISTERED);
-    this.alreadyPremium = serializer.deserialize(Settings.IMP.MAIN.STRINGS.ALREADY_PREMIUM);
-    this.successful = serializer.deserialize(Settings.IMP.MAIN.STRINGS.PREMIUM_SUCCESSFUL);
-    this.errorOccurred = serializer.deserialize(Settings.IMP.MAIN.STRINGS.ERROR_OCCURRED);
-    this.notPremium = serializer.deserialize(Settings.IMP.MAIN.STRINGS.NOT_PREMIUM);
-    this.wrongPassword = serializer.deserialize(Settings.IMP.MAIN.STRINGS.WRONG_PASSWORD);
-    this.usage = serializer.deserialize(Settings.IMP.MAIN.STRINGS.PREMIUM_USAGE);
-    this.notPlayer = serializer.deserialize(Settings.IMP.MAIN.STRINGS.NOT_PLAYER);
+    this.logger = this.plugin.getLogger();
+    this.databaseService = databaseService;
+    this.authenticationService = authenticationService;
+    this.cacheManager = cacheManager;
   }
 
   @Override
-  public void execute(CommandSource source, String[] args) {
-    if (source instanceof Player) {
-      if (args.length == 2) {
-        if (this.confirmKeyword.equalsIgnoreCase(args[1])) {
-          String usernameLowercase = ((Player) source).getUsername().toLowerCase(Locale.ROOT);
-          RegisteredPlayer player = AuthSessionHandler.fetchInfoLowercased(this.playerDao, usernameLowercase);
-          if (player == null) {
-            source.sendMessage(this.notRegistered);
-          } else if (player.getHash().isEmpty()) {
-            source.sendMessage(this.alreadyPremium);
-          } else if (AuthSessionHandler.checkPassword(args[0], player, this.playerDao)) {
-            if (this.plugin.isPremiumExternal(usernameLowercase).getState() == LimboAuth.PremiumState.PREMIUM_USERNAME) {
-              try {
-                player.setHash("");
-                this.playerDao.update(player);
-                this.plugin.removePlayerFromCacheLowercased(usernameLowercase);
-                ((Player) source).disconnect(this.successful);
-              } catch (SQLException e) {
-                source.sendMessage(this.errorOccurred);
-                throw new SQLRuntimeException(e);
-              }
-            } else {
-              source.sendMessage(this.notPremium);
-            }
-          } else {
-            source.sendMessage(this.wrongPassword);
+  protected void execute(
+      CommandSource source, String[] args, Component ratelimitedMessageComponent) {
+    if (!(source instanceof Player)) {
+      source.sendMessage(
+          configManager
+              .getSerializer()
+              .deserialize(configManager.getSettings().MAIN.STRINGS.NOT_PLAYER));
+      return;
+    }
+
+    Player commandPlayer = (Player) source;
+    Settings currentSettings = this.configManager.getSettings();
+    Serializer currentSerializer = this.configManager.getSerializer();
+
+    final String confirmKeyword = currentSettings.MAIN.CONFIRM_KEYWORD;
+    final Component notRegisteredMsg =
+        currentSerializer.deserialize(currentSettings.MAIN.STRINGS.NOT_REGISTERED);
+    final Component alreadyPremiumMsg =
+        currentSerializer.deserialize(currentSettings.MAIN.STRINGS.ALREADY_PREMIUM);
+    final Component successfulMsg =
+        currentSerializer.deserialize(currentSettings.MAIN.STRINGS.PREMIUM_SUCCESSFUL);
+    final Component errorOccurredMsg =
+        currentSerializer.deserialize(currentSettings.MAIN.STRINGS.ERROR_OCCURRED);
+    final Component notPremiumOnlineMsg =
+        currentSerializer.deserialize(currentSettings.MAIN.STRINGS.NOT_PREMIUM);
+    final Component wrongPasswordMsg =
+        currentSerializer.deserialize(currentSettings.MAIN.STRINGS.WRONG_PASSWORD);
+    final Component usageMsg =
+        currentSerializer.deserialize(currentSettings.MAIN.STRINGS.PREMIUM_USAGE);
+
+    if (args.length != 2 || !confirmKeyword.equalsIgnoreCase(args[1])) {
+      source.sendMessage(usageMsg);
+      return;
+    }
+
+    String usernameLowercase = commandPlayer.getUsername().toLowerCase(Locale.ROOT);
+    RegisteredPlayer registeredPlayer =
+        this.databaseService.findPlayerByLowercaseNickname(usernameLowercase);
+
+    if (registeredPlayer == null) {
+      source.sendMessage(notRegisteredMsg);
+      return;
+    }
+    if (registeredPlayer.getHash().isEmpty()) { // Already marked as premium (no password hash)
+      source.sendMessage(alreadyPremiumMsg);
+      return;
+    }
+
+    if (!authenticationService.checkPassword(args[0], registeredPlayer)) {
+      source.sendMessage(wrongPasswordMsg);
+      return;
+    }
+
+    // Check with external Mojang API if the username is actually premium
+    LimboAuth.PremiumResponse premiumCheck =
+        this.authenticationService.isPremiumExternal(commandPlayer.getUsername());
+
+    if (premiumCheck.getState() == LimboAuth.PremiumState.PREMIUM_USERNAME) {
+      try {
+        registeredPlayer.setHash(""); // Clear password to mark as premium
+        if (premiumCheck.getUuid() != null) { // Save the Mojang UUID
+          registeredPlayer.setPremiumUuid(premiumCheck.getUuid());
+          if (currentSettings.MAIN.SAVE_UUID) { // If SAVE_UUID, also set the main UUID
+            registeredPlayer.setUuid(premiumCheck.getUuid().toString());
           }
-
-          return;
         }
+        this.databaseService.updatePlayer(registeredPlayer);
+        this.cacheManager.removeAuthUserFromCache(
+            commandPlayer.getUsername()); // Invalidate session
+        commandPlayer.disconnect(successfulMsg); // Disconnect to force re-login with premium status
+      } catch (SQLRuntimeException e) {
+        this.logger.error("SQL error converting {} to premium:", usernameLowercase, e);
+        source.sendMessage(errorOccurredMsg);
       }
-
-      source.sendMessage(this.usage);
     } else {
-      source.sendMessage(this.notPlayer);
+      // Handle other states like CRACKED, UNKNOWN, RATE_LIMIT, ERROR
+      source.sendMessage(notPremiumOnlineMsg);
+      if (premiumCheck.getState() == LimboAuth.PremiumState.RATE_LIMIT) {
+        source.sendMessage(
+            currentSerializer.deserialize(currentSettings.MAIN.STRINGS.MOJANG_API_RATE_LIMITED));
+      } else if (premiumCheck.getState() == LimboAuth.PremiumState.ERROR) {
+        source.sendMessage(
+            currentSerializer.deserialize(currentSettings.MAIN.STRINGS.MOJANG_API_ERROR));
+      }
     }
   }
 
   @Override
   public boolean hasPermission(SimpleCommand.Invocation invocation) {
-    return Settings.IMP.MAIN.COMMAND_PERMISSION_STATE.PREMIUM
+    return super.configManager
+        .getCommandPermissionState()
+        .PREMIUM
         .hasPermission(invocation.source(), "limboauth.commands.premium");
   }
 }

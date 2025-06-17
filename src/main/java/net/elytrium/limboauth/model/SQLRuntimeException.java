@@ -1,28 +1,29 @@
-/*
- * Copyright (C) 2021 - 2025 Elytrium
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
 package net.elytrium.limboauth.model;
 
+/**
+ * A custom {@link RuntimeException} used to wrap SQLExceptions and other database-related errors
+ * occurring within LimboAuth. This allows for more specific error handling and统一 (unified)
+ * reporting of database issues.
+ */
 public class SQLRuntimeException extends RuntimeException {
 
+  /**
+   * Constructs a new SQLRuntimeException with a default message and the specified cause.
+   *
+   * @param cause The underlying cause of this exception.
+   */
+  /** Default constructor. */
   public SQLRuntimeException(Throwable cause) {
     this("An unexpected internal error was caught during the database SQL operations.", cause);
   }
 
+  /**
+   * Constructs a new SQLRuntimeException with the specified detail message and cause.
+   *
+   * @param message The detail message.
+   * @param cause The underlying cause of this exception.
+   */
+  /** Default constructor. */
   public SQLRuntimeException(String message, Throwable cause) {
     super(message, cause);
   }

@@ -1,105 +1,129 @@
-/*
- * Copyright (C) 2021 - 2025 Elytrium
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
 package net.elytrium.limboauth.command;
 
-import com.j256.ormlite.dao.Dao;
 import com.velocitypowered.api.command.CommandSource;
 import com.velocitypowered.api.command.SimpleCommand;
 import com.velocitypowered.api.proxy.Player;
-import java.sql.SQLException;
 import java.util.Locale;
 import net.elytrium.commons.kyori.serialization.Serializer;
 import net.elytrium.limboauth.LimboAuth;
 import net.elytrium.limboauth.Settings;
 import net.elytrium.limboauth.event.AuthUnregisterEvent;
-import net.elytrium.limboauth.handler.AuthSessionHandler;
 import net.elytrium.limboauth.model.RegisteredPlayer;
 import net.elytrium.limboauth.model.SQLRuntimeException;
+import net.elytrium.limboauth.service.AuthenticationService;
+import net.elytrium.limboauth.service.CacheManager;
+import net.elytrium.limboauth.service.ConfigManager;
+import net.elytrium.limboauth.service.DatabaseService;
 import net.kyori.adventure.text.Component;
+import org.slf4j.Logger;
 
+/**
+ * Command for players to unregister their own account. Requires password confirmation and handles
+ * database deletion, cache invalidation, and disconnecting the player.
+ */
 public class UnregisterCommand extends RatelimitedCommand {
 
   private final LimboAuth plugin;
-  private final Dao<RegisteredPlayer, String> playerDao;
+  private final Logger logger;
+  private final DatabaseService databaseService;
+  private final AuthenticationService authenticationService;
+  private final CacheManager cacheManager;
 
-  private final String confirmKeyword;
-  private final Component notPlayer;
-  private final Component notRegistered;
-  private final Component successful;
-  private final Component errorOccurred;
-  private final Component wrongPassword;
-  private final Component usage;
-  private final Component crackedCommand;
-
-  public UnregisterCommand(LimboAuth plugin, Dao<RegisteredPlayer, String> playerDao) {
+  /**
+   * Constructs the UnregisterCommand.
+   *
+   * @param plugin The main LimboAuth plugin instance.
+   * @param databaseService Service for database interactions.
+   * @param authenticationService Service for authentication logic.
+   * @param cacheManager Service for managing caches.
+   * @param configManager Service for accessing configuration.
+   */
+  public UnregisterCommand(
+      LimboAuth plugin,
+      DatabaseService databaseService,
+      AuthenticationService authenticationService,
+      CacheManager cacheManager,
+      ConfigManager configManager) {
+    super(configManager);
     this.plugin = plugin;
-    this.playerDao = playerDao;
-
-    Serializer serializer = LimboAuth.getSerializer();
-    this.confirmKeyword = Settings.IMP.MAIN.CONFIRM_KEYWORD;
-    this.notPlayer = serializer.deserialize(Settings.IMP.MAIN.STRINGS.NOT_PLAYER);
-    this.notRegistered = serializer.deserialize(Settings.IMP.MAIN.STRINGS.NOT_REGISTERED);
-    this.successful = serializer.deserialize(Settings.IMP.MAIN.STRINGS.UNREGISTER_SUCCESSFUL);
-    this.errorOccurred = serializer.deserialize(Settings.IMP.MAIN.STRINGS.ERROR_OCCURRED);
-    this.wrongPassword = serializer.deserialize(Settings.IMP.MAIN.STRINGS.WRONG_PASSWORD);
-    this.usage = serializer.deserialize(Settings.IMP.MAIN.STRINGS.UNREGISTER_USAGE);
-    this.crackedCommand = serializer.deserialize(Settings.IMP.MAIN.STRINGS.CRACKED_COMMAND);
+    this.logger = this.plugin.getLogger();
+    this.databaseService = databaseService;
+    this.authenticationService = authenticationService;
+    this.cacheManager = cacheManager;
   }
 
   @Override
-  public void execute(CommandSource source, String[] args) {
-    if (source instanceof Player) {
-      if (args.length == 2) {
-        if (this.confirmKeyword.equalsIgnoreCase(args[1])) {
-          String username = ((Player) source).getUsername();
-          String usernameLowercase = username.toLowerCase(Locale.ROOT);
-          RegisteredPlayer player = AuthSessionHandler.fetchInfoLowercased(this.playerDao, usernameLowercase);
-          if (player == null) {
-            source.sendMessage(this.notRegistered);
-          } else if (player.getHash().isEmpty()) {
-            source.sendMessage(this.crackedCommand);
-          } else if (AuthSessionHandler.checkPassword(args[0], player, this.playerDao)) {
-            try {
-              this.plugin.getServer().getEventManager().fireAndForget(new AuthUnregisterEvent(username));
-              this.playerDao.deleteById(usernameLowercase);
-              this.plugin.removePlayerFromCacheLowercased(usernameLowercase);
-              ((Player) source).disconnect(this.successful);
-            } catch (SQLException e) {
-              source.sendMessage(this.errorOccurred);
-              throw new SQLRuntimeException(e);
-            }
-          } else {
-            source.sendMessage(this.wrongPassword);
-          }
+  protected void execute(
+      CommandSource source, String[] args, Component ratelimitedMessageComponent) {
+    if (!(source instanceof Player)) {
+      source.sendMessage(
+          configManager
+              .getSerializer()
+              .deserialize(configManager.getSettings().MAIN.STRINGS.NOT_PLAYER));
+      return;
+    }
 
-          return;
-        }
-      }
+    Player commandPlayer = (Player) source;
+    Settings currentSettings = this.configManager.getSettings();
+    Serializer currentSerializer = this.configManager.getSerializer();
 
-      source.sendMessage(this.usage);
-    } else {
-      source.sendMessage(this.notPlayer);
+    final String confirmKeyword = currentSettings.MAIN.CONFIRM_KEYWORD;
+    final Component usageMsg =
+        currentSerializer.deserialize(currentSettings.MAIN.STRINGS.UNREGISTER_USAGE);
+    final Component notRegisteredMsg =
+        currentSerializer.deserialize(currentSettings.MAIN.STRINGS.NOT_REGISTERED);
+    final Component crackedCommandMsg =
+        currentSerializer.deserialize(currentSettings.MAIN.STRINGS.CRACKED_COMMAND);
+    final Component wrongPasswordMsg =
+        currentSerializer.deserialize(currentSettings.MAIN.STRINGS.WRONG_PASSWORD);
+    final Component successfulMsg =
+        currentSerializer.deserialize(currentSettings.MAIN.STRINGS.UNREGISTER_SUCCESSFUL);
+    final Component errorOccurredMsg =
+        currentSerializer.deserialize(currentSettings.MAIN.STRINGS.ERROR_OCCURRED);
+
+    if (args.length != 2 || !confirmKeyword.equalsIgnoreCase(args[1])) {
+      source.sendMessage(usageMsg);
+      return;
+    }
+
+    String username = commandPlayer.getUsername();
+    String usernameLowercase = username.toLowerCase(Locale.ROOT);
+    RegisteredPlayer registeredPlayer =
+        this.databaseService.findPlayerByLowercaseNickname(usernameLowercase);
+
+    if (registeredPlayer == null) {
+      source.sendMessage(notRegisteredMsg);
+      return;
+    }
+    if (registeredPlayer.getHash().isEmpty()) {
+      source.sendMessage(crackedCommandMsg);
+      return;
+    }
+
+    if (!authenticationService.checkPassword(args[0], registeredPlayer)) {
+      source.sendMessage(wrongPasswordMsg);
+      return;
+    }
+
+    try {
+      this.plugin.getServer().getEventManager().fireAndForget(new AuthUnregisterEvent(username));
+      this.databaseService.deletePlayerByLowercaseNickname(usernameLowercase);
+      this.cacheManager.removeAuthUserFromCache(username);
+      commandPlayer.disconnect(successfulMsg);
+    } catch (SQLRuntimeException e) {
+      this.logger.error("SQL error during unregister for {}:", usernameLowercase, e);
+      source.sendMessage(errorOccurredMsg);
+    } catch (Exception e) {
+      this.logger.error("Unexpected error during unregister for {}:", usernameLowercase, e);
+      source.sendMessage(errorOccurredMsg);
     }
   }
 
   @Override
   public boolean hasPermission(SimpleCommand.Invocation invocation) {
-    return Settings.IMP.MAIN.COMMAND_PERMISSION_STATE.UNREGISTER
+    return this.configManager
+        .getCommandPermissionState()
+        .UNREGISTER
         .hasPermission(invocation.source(), "limboauth.commands.unregister");
   }
 }

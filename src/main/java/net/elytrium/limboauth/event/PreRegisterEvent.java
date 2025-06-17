@@ -1,27 +1,30 @@
-/*
- * Copyright (C) 2021 - 2025 Elytrium
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
 package net.elytrium.limboauth.event;
 
 import com.velocitypowered.api.proxy.Player;
 import java.util.function.Consumer;
 
+/**
+ * Event fired before a new player attempts to register. This event occurs after initial checks
+ * (like nickname validation) but before the player is prompted for a password or their data is
+ * saved to the database.
+ *
+ * <p>This is an asynchronous event. Handlers can perform actions that might take time, such as
+ * checking against an external whitelist or performing additional validation. The main registration
+ * flow will wait for this event to complete (or be cancelled) before proceeding. Handlers can
+ * cancel this event to prevent the player from attempting to register, or modify its result to
+ * bypass standard registration procedures.
+ */
 public class PreRegisterEvent extends PreEvent {
 
+  /**
+   * Constructs a PreRegisterEvent.
+   *
+   * @param onComplete A consumer to be called when this event's processing is finished or
+   *     cancelled.
+   * @param result The initial {@link Result} of this event.
+   * @param player The {@link Player} attempting to register.
+   */
+  /** Default constructor. */
   public PreRegisterEvent(Consumer<TaskEvent> onComplete, Result result, Player player) {
     super(onComplete, result, player);
   }

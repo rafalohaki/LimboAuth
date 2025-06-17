@@ -1,0 +1,372 @@
+#!/bin/bash
+
+# 🔍 SKRYPT DIAGNOSTYCZNY - LimboAuth Build Status
+# Autor: AI Assistant (udoskonalony przez Gemini)
+# Data: 2025-06-15
+# Wersja: 3.1.1 - Drobne poprawki stylistyczne i w logowaniu
+
+# --- Konfiguracja Bezpieczeństwa ---
+set -uo pipefail # Zatrzymaj skrypt przy nierozpoznanych zmiennych i błędach w potokach
+# UWAGA: set -e jest celowo pominięte tutaj, aby pozwolić skryptowi kontynuować
+# i zebrać wszystkie wyniki testów, nawet jeśli poszczególne zadania Gradle zawiodą.
+# Kody wyjścia zadań są sprawdzane indywidualnie.
+
+# --- Stałe ---
+readonly SCRIPT_NAME="LimboAuth Build Diagnostics"
+readonly SCRIPT_VERSION="3.1.1"
+readonly LOG_DIR="build/diagnostics_logs" # Katalog na logi poszczególnych zadań
+mkdir -p "$LOG_DIR" # Utwórz katalog na logi, jeśli nie istnieje
+
+# Kolory dla lepszej czytelności
+readonly RED='\033[0;31m'
+readonly GREEN='\033[0;32m'
+readonly YELLOW='\033[1;33m'
+readonly BLUE='\033[0;34m'
+readonly NC='\033[0m' # No Color
+
+# --- Zmienne Globalne Statusu ---
+# 0 - OK, 1 - Ostrzeżenia, 2 - Błędy/Niepowodzenie
+declare -i COMPILATION_STATUS=0
+declare -i CHECKSTYLE_STATUS=0
+declare -i SPOTBUGS_STATUS=0
+declare -i JAVADOC_STATUS=0
+declare -i FORMATTING_STATUS=0
+declare -i UNIT_TESTS_STATUS=0
+
+# Liczniki
+declare -i CHECKSTYLE_ERRORS_COUNT=0
+declare -i CHECKSTYLE_WARNINGS_COUNT=0
+declare -i JAVADOC_WARNINGS_COUNT=0
+declare -i UNIT_TESTS_FAILED_COUNT=0 # Przybliżona liczba z logu
+
+# --- Funkcje Pomocnicze ---
+
+log_message() {
+    local type="$1"
+    local message="$2"
+    local timestamp
+    timestamp=$(date +"%Y-%m-%d %H:%M:%S")
+
+    case "$type" in
+        "INFO") echo -e "${BLUE}[INFO]${NC} $timestamp: $message" ;;
+        "OK") echo -e "${GREEN}[OK]${NC}   $timestamp: $message" ;;
+        "WARN") echo -e "${YELLOW}[WARN]${NC} $timestamp: $message" ;;
+        "ERROR") echo -e "${RED}[ERROR]${NC} $timestamp: $message" ;; # Poprawiona spacja
+        "STEP") echo -e "\n${BLUE}📋 $message${NC}\n--------------------------------------------------" ;;
+        "SUBSTEP") echo -e "  -> $message" ;;
+        *) echo "$timestamp: $message" ;;
+    esac
+}
+
+run_gradle_task() {
+    local task_name="$1"
+    local log_file_name_suffix="$2" # np. "compile_java"
+    local safe_task_name_for_file="${task_name//:/_}"
+    local full_log_path="$LOG_DIR/${safe_task_name_for_file}_${log_file_name_suffix}.log"
+
+    log_message "SUBSTEP" "Uruchamianie zadania Gradle: '$task_name' (log: $full_log_path)"
+
+    if [[ ! -x "./gradlew" ]]; then
+        log_message "ERROR" "Plik './gradlew' nie jest wykonywalny lub nie istnieje."
+        return 126
+    fi
+
+    (
+      ./gradlew "$task_name" --console=plain
+    ) > "$full_log_path" 2>&1
+    local gradle_exit_code=$?
+
+    if [[ $gradle_exit_code -ne 0 ]]; then
+        log_message "WARN" "Zadanie Gradle '$task_name' zakończyło się z kodem wyjścia: $gradle_exit_code."
+    fi
+    return "$gradle_exit_code"
+}
+
+# --- Główna Logika Skryptu ---
+
+echo "🎯 DIAGNOSTYKA LIMBOAUTH - ANALIZA POSTĘPU"
+echo "=========================================="
+log_message "INFO" "Rozpoczęcie diagnostyki (skrypt wersja $SCRIPT_VERSION)..."
+log_message "INFO" "Szczegółowe logi zadań będą zapisywane w katalogu: $LOG_DIR"
+
+
+# 1. SPRAWDZENIE ŚRODOWISKA
+log_message "STEP" "1. SPRAWDZENIE ŚRODOWISKA"
+
+java_ok=false
+if command -v java &> /dev/null; then
+    java_version=$(java -version 2>&1 | head -n 1 | tr -d '\r\n')
+    log_message "OK" "Java: $java_version"
+    java_ok=true
+else
+    log_message "ERROR" "Java: Nie znaleziono w PATH."
+fi
+
+gradlew_ok=false
+if [[ -f "./gradlew" ]]; then
+    if [[ -x "./gradlew" ]]; then
+        log_message "OK" "Gradle Wrapper: Dostępny i wykonywalny."
+        gradlew_ok=true
+    else
+        log_message "WARN" "Gradle Wrapper: Plik istnieje, ale nie jest wykonywalny. Próba nadania uprawnień..."
+        if chmod +x ./gradlew; then
+            log_message "OK" "Gradle Wrapper: Nadano uprawnienia wykonania."
+            gradlew_ok=true
+        else
+            log_message "ERROR" "Gradle Wrapper: Nie można nadać uprawnień wykonania. Sprawdź uprawnienia."
+        fi
+    fi
+else
+    log_message "ERROR" "Gradle Wrapper: Brak pliku './gradlew'."
+fi
+
+if ! $gradlew_ok; then
+    log_message "ERROR" "Krytyczny błąd: Gradle Wrapper nie jest dostępny lub wykonywalny. Dalsza diagnostyka niemożliwa."
+    exit 1
+fi
+
+
+build_script_ok=false
+if [[ -f "build.gradle" || -f "build.gradle.kts" ]]; then
+    script_name=$([[ -f "build.gradle" ]] && echo "build.gradle" || echo "build.gradle.kts")
+    log_message "OK" "Build Script: $script_name znaleziony."
+    build_script_ok=true
+else
+    log_message "ERROR" "Build Script: Brak pliku 'build.gradle' lub 'build.gradle.kts'."
+fi
+
+
+# 2. SZYBKI TEST BUILDU (Kompilacja)
+log_message "STEP" "2. SZYBKI TEST BUILDU (Kompilacja)"
+if run_gradle_task "clean compileJava" "compile_java"; then
+    log_message "OK" "Kompilacja: SUKCES."
+    COMPILATION_STATUS=0
+else
+    log_message "ERROR" "Kompilacja: BŁĘDY. Sprawdź log w $LOG_DIR/clean_compileJava_compile_java.log oraz uruchom: ./gradlew compileJava --stacktrace"
+    COMPILATION_STATUS=2
+fi
+
+# 3. ANALIZA CHECKSTYLE
+log_message "STEP" "3. ANALIZA CHECKSTYLE"
+task_failed_checkstyle=false
+checkstyle_log_file="$LOG_DIR/checkstyleMain_checkstyle.log"
+if ! run_gradle_task "checkstyleMain" "checkstyle"; then
+    task_failed_checkstyle=true
+    CHECKSTYLE_STATUS=2
+fi
+
+checkstyle_log_content=$(cat "$checkstyle_log_file" 2>/dev/null || echo "")
+CHECKSTYLE_ERRORS_COUNT=$(echo "$checkstyle_log_content" | grep -o '[0-9]\+ error' | grep -Eo '[0-9]+' | head -n 1 || echo "0")
+CHECKSTYLE_WARNINGS_COUNT=$(echo "$checkstyle_log_content" | grep -o '[0-9]\+ warning' | grep -Eo '[0-9]+' | head -n 1 || echo "0")
+
+
+if [[ $CHECKSTYLE_ERRORS_COUNT -gt 0 ]]; then
+    CHECKSTYLE_STATUS=2
+    log_message "ERROR" "Checkstyle: Znaleziono $CHECKSTYLE_ERRORS_COUNT błędów, $CHECKSTYLE_WARNINGS_COUNT ostrzeżeń. Log: $checkstyle_log_file"
+elif [[ $CHECKSTYLE_WARNINGS_COUNT -gt 0 ]]; then
+    if [[ $CHECKSTYLE_STATUS -ne 2 ]]; then
+        CHECKSTYLE_STATUS=1
+    fi
+    log_message "WARN" "Checkstyle: Znaleziono $CHECKSTYLE_WARNINGS_COUNT ostrzeżeń (0 błędów). Log: $checkstyle_log_file"
+elif $task_failed_checkstyle; then
+    log_message "ERROR" "Checkstyle: Zadanie checkstyleMain nie powiodło się, ale nie znaleziono szczegółów błędów/ostrzeżeń w logu. Log: $checkstyle_log_file"
+    CHECKSTYLE_STATUS=2
+else
+    CHECKSTYLE_STATUS=0
+    log_message "OK" "Checkstyle: CZYSTO (0 błędów, 0 ostrzeżeń)."
+fi
+
+
+# 4. ANALIZA SPOTBUGS
+log_message "STEP" "4. ANALIZA SPOTBUGS"
+spotbugs_log_file="$LOG_DIR/spotbugsMain_spotbugs.log"
+if run_gradle_task "spotbugsMain" "spotbugs"; then
+    log_message "OK" "SpotBugs: CZYSTO (lub zadanie skonfigurowane by ignorować błędy)."
+    SPOTBUGS_STATUS=0
+else
+    log_message "ERROR" "SpotBugs: WYKRYTO PROBLEMY lub BŁĄD ZADANIA. Sprawdź raport HTML oraz log: $spotbugs_log_file"
+    SPOTBUGS_STATUS=2
+fi
+
+# 5. SPRAWDZENIE JAVADOC
+log_message "STEP" "5. SPRAWDZENIE JAVADOC"
+javadoc_log_file="$LOG_DIR/javadoc_javadoc.log"
+if run_gradle_task "javadoc" "javadoc"; then
+    javadoc_log_content=$(cat "$javadoc_log_file" 2>/dev/null || echo "")
+    JAVADOC_WARNINGS_COUNT=$(echo "$javadoc_log_content" | grep -ci "warning:" || echo "0")
+
+    if [[ $JAVADOC_WARNINGS_COUNT -eq 0 ]]; then
+        log_message "OK" "JavaDoc: CZYSTO (0 istotnych ostrzeżeń)."
+        JAVADOC_STATUS=0
+    else
+        log_message "WARN" "JavaDoc: Znaleziono $JAVADOC_WARNINGS_COUNT ostrzeżeń. Log: $javadoc_log_file"
+        JAVADOC_STATUS=1
+    fi
+else
+    log_message "ERROR" "JavaDoc: BŁĄD podczas generowania dokumentacji. Log: $javadoc_log_file"
+    JAVADOC_STATUS=2
+fi
+
+# 6. SPRAWDZENIE FORMATOWANIA (Spotless)
+log_message "STEP" "6. SPRAWDZENIE FORMATOWANIA (Spotless)"
+spotless_log_file="$LOG_DIR/spotlessCheck_spotless.log"
+if run_gradle_task "spotlessCheck" "spotless"; then
+    log_message "OK" "Formatowanie: PRAWIDŁOWE."
+    FORMATTING_STATUS=0
+else
+    log_message "ERROR" "Formatowanie: WYMAGA POPRAWEK lub BŁĄD ZADANIA. Uruchom: ./gradlew spotlessApply. Log: $spotless_log_file"
+    FORMATTING_STATUS=2
+fi
+
+# 7. TESTY JEDNOSTKOWE
+log_message "STEP" "7. TESTY JEDNOSTKOWE"
+unit_tests_log_file="$LOG_DIR/test_unit_tests.log"
+if run_gradle_task "test" "unit_tests"; then
+    log_message "OK" "Testy Jednostkowe: ZADANIE 'test' ZAKOŃCZONE POWODZENIEM."
+    UNIT_TESTS_STATUS=0
+else
+    log_message "WARN" "Testy Jednostkowe: ZADANIE 'test' NIE POWIODŁO SIĘ. Sprawdź raport HTML (build/reports/tests/test/) oraz log: $unit_tests_log_file"
+    UNIT_TESTS_STATUS=1
+    
+    test_log_content=$(cat "$unit_tests_log_file" 2>/dev/null || echo "")
+    UNIT_TESTS_FAILED_COUNT_TEXT=$(echo "$test_log_content" | grep -Eo '[0-9]+ tests? failed' | head -n 1)
+    if [[ -n "$UNIT_TESTS_FAILED_COUNT_TEXT" ]]; then
+        UNIT_TESTS_FAILED_COUNT=$(echo "$UNIT_TESTS_FAILED_COUNT_TEXT" | grep -Eo '[0-9]+')
+    else
+        UNIT_TESTS_FAILED_COUNT_TEXT="Nieznana liczba"
+        UNIT_TESTS_FAILED_COUNT=0
+    fi
+    
+    if [[ "$UNIT_TESTS_FAILED_COUNT_TEXT" != "Nieznana liczba" && $UNIT_TESTS_FAILED_COUNT -gt 0 ]]; then
+         log_message "INFO" "Testy Jednostkowe: Wykryto informację o $UNIT_TESTS_FAILED_COUNT nieudanych testach w logu."
+    elif [[ "$UNIT_TESTS_FAILED_COUNT_TEXT" == "Nieznana liczba" && $UNIT_TESTS_STATUS -eq 1 ]]; then
+         log_message "INFO" "Testy Jednostkowe: Nie udało się automatycznie określić liczby nieudanych testów z logu."
+    fi
+fi
+
+
+# --- PODSUMOWANIE I REKOMENDACJE ---
+log_message "STEP" "📊 PODSUMOWANIE STANU PROJEKTU $SCRIPT_NAME"
+
+declare -i critical_issues_count=0
+declare -i warning_issues_count=0
+
+(( COMPILATION_STATUS == 2 )) && ((critical_issues_count++))
+(( CHECKSTYLE_STATUS == 2 )) && ((critical_issues_count++))
+(( CHECKSTYLE_STATUS == 1 )) && ((warning_issues_count++))
+(( SPOTBUGS_STATUS == 2 )) && ((critical_issues_count++))
+(( JAVADOC_STATUS == 2 )) && ((critical_issues_count++))
+(( JAVADOC_STATUS == 1 )) && ((warning_issues_count++))
+(( FORMATTING_STATUS == 2 )) && ((critical_issues_count++))
+
+if [[ $UNIT_TESTS_STATUS -eq 2 ]]; then
+    ((critical_issues_count++))
+elif [[ $UNIT_TESTS_STATUS -eq 1 ]]; then
+    ((warning_issues_count++))
+fi
+
+
+echo "PODLICZENIE PROBLEMÓW:"
+echo -e "  🔴 ${RED}Krytyczne problemy (błędy): $critical_issues_count${NC}"
+echo -e "  🟡 ${YELLOW}Ostrzeżenia: $warning_issues_count${NC}"
+echo "--------------------------------------------------"
+echo "SZCZEGÓŁOWE WYNIKI TESTÓW:"
+
+print_test_status() {
+    local test_name="$1"
+    local status_code="$2"
+    local details="${3:-}"
+    case "$status_code" in
+        0) echo -e "  ✅ $test_name: ${GREEN}OK${NC} $details" ;;
+        1) echo -e "  ⚠️  $test_name: ${YELLOW}OSTRZEŻENIA${NC} $details" ;;
+        2) echo -e "  ❌ $test_name: ${RED}BŁĘDY/NIEPOWODZENIE${NC} $details" ;;
+    esac
+}
+print_test_status "Kompilacja" "$COMPILATION_STATUS"
+print_test_status "Checkstyle" "$CHECKSTYLE_STATUS" "($CHECKSTYLE_ERRORS_COUNT błędów, $CHECKSTYLE_WARNINGS_COUNT ostrzeżeń)"
+print_test_status "SpotBugs" "$SPOTBUGS_STATUS"
+print_test_status "JavaDoc" "$JAVADOC_STATUS" "($JAVADOC_WARNINGS_COUNT ostrzeżeń)"
+print_test_status "Formatowanie (Spotless)" "$FORMATTING_STATUS"
+
+unit_test_details=""
+if [[ $UNIT_TESTS_STATUS -ne 0 ]]; then
+    if [[ "$UNIT_TESTS_FAILED_COUNT_TEXT" != "Nieznana liczba" && $UNIT_TESTS_FAILED_COUNT -gt 0 ]]; then
+        unit_test_details="(Wykryto $UNIT_TESTS_FAILED_COUNT nieudanych testów w logu)"
+    else
+        unit_test_details="(Zadanie 'test' nie powiodło się lub nie można było sparsować liczby błędów)"
+    fi
+fi
+print_test_status "Testy Jednostkowe" "$UNIT_TESTS_STATUS" "$unit_test_details"
+echo "--------------------------------------------------"
+
+FINAL_STATUS_MESSAGE=""
+if [[ $critical_issues_count -eq 0 && $warning_issues_count -eq 0 ]]; then
+    FINAL_STATUS_MESSAGE="${GREEN}🎉 GRATULACJE! Projekt jest w doskonałym stanie!${NC}\n   Wszystkie kluczowe testy jakości kodu przeszły pomyślnie i nie ma ostrzeżeń."
+elif [[ $critical_issues_count -eq 0 && $warning_issues_count -gt 0 ]]; then
+    FINAL_STATUS_MESSAGE="${YELLOW}👍 DOBRZE, ALE... Nie ma krytycznych błędów, ale znaleziono $warning_issues_count grup(ę) ostrzeżeń.${NC}\n   Zaleca się przejrzenie ostrzeżeń, aby poprawić jakość kodu."
+    echo "🔧 ZALECANE DZIAŁANIA:"
+    echo "   1. Przejrzyj logi zadań w katalogu: $LOG_DIR"
+    echo "   2. Jeśli są problemy z testami: ./gradlew test --rerun-tasks (lub sprawdź raporty HTML w build/reports/tests/test/)"
+    echo "   3. Uruchom ./gradlew build aby sprawdzić całość."
+else
+    FINAL_STATUS_MESSAGE="${RED}⚠️  WYMAGA UWAGI! Znaleziono $critical_issues_count krytycznych problemów.${NC}"
+    [[ $warning_issues_count -gt 0 ]] && FINAL_STATUS_MESSAGE+="\n   ${YELLOW}Dodatkowo jest $warning_issues_count grup(y) ostrzeżeń.${NC}"
+    echo "🔧 PLAN NAPRAWY (sugestie):"
+    echo "   1. Zacznij od naprawy błędów kompilacji (jeśli występują): log w $LOG_DIR/"
+    echo "   2. Jeśli są błędy formatowania: ./gradlew spotlessApply (log w $LOG_DIR/)"
+    echo "   3. Przeanalizuj raporty Checkstyle i SpotBugs (w build/reports/ oraz logi w $LOG_DIR)."
+    echo "   4. Popraw błędy i ostrzeżenia zgłoszone przez narzędzia."
+    echo "   5. Sprawdź logi zadań w katalogu $LOG_DIR dla szczegółów."
+fi
+echo -e "\n$FINAL_STATUS_MESSAGE"
+
+echo ""
+echo "🔗 PRZYDATNE KOMENDY:"
+echo "   ./gradlew tasks --all                 # Lista wszystkich zadań Gradle"
+echo "   ./gradlew build --stacktrace          # Pełny build ze szczegółowym logiem błędów"
+echo "   ./gradlew spotlessApply               # Automatyczne formatowanie kodu"
+echo "   ./gradlew check                       # Uruchamia wszystkie zadania weryfikacyjne (checkstyle, spotbugs, testy itp.)"
+echo "   ./gradlew dependencies                # Wyświetla drzewo zależności projektu"
+echo "   Katalog z logami diagnostycznymi: $LOG_DIR"
+
+
+# --- ZAPIS RAPORTU I KOD WYJŚCIA ---
+report_file_name="build-diagnostics-$(date +%Y%m%d-%H%M%S).txt"
+
+format_test_status_for_file() {
+    local test_name="$1"
+    local status_code="$2"
+    local details="${3:-}"
+    local status_text
+    case "$status_code" in
+        0) status_text="OK" ;;
+        1) status_text="OSTRZEŻENIA" ;;
+        2) status_text="BŁĘDY/NIEPOWODZENIE" ;;
+        *) status_text="NIEZNANY" ;;
+    esac
+    echo "  $test_name: $status_text $details"
+}
+
+summary_for_report="Diagnostyka LimboAuth - $(date +"%Y-%m-%d %H:%M:%S")\n\n"
+summary_for_report+="PODLICZENIE PROBLEMÓW:\n"
+summary_for_report+="  Krytyczne problemy (błędy): $critical_issues_count\n"
+summary_for_report+="  Ostrzeżenia: $warning_issues_count\n\n"
+summary_for_report+="SZCZEGÓŁOWE WYNIKI TESTÓW:\n"
+summary_for_report+=$(format_test_status_for_file "Kompilacja" "$COMPILATION_STATUS" "")"\n"
+summary_for_report+=$(format_test_status_for_file "Checkstyle" "$CHECKSTYLE_STATUS" "($CHECKSTYLE_ERRORS_COUNT błędów, $CHECKSTYLE_WARNINGS_COUNT ostrzeżeń)")"\n"
+summary_for_report+=$(format_test_status_for_file "SpotBugs" "$SPOTBUGS_STATUS" "")"\n"
+summary_for_report+=$(format_test_status_for_file "JavaDoc" "$JAVADOC_STATUS" "($JAVADOC_WARNINGS_COUNT ostrzeżeń)")"\n"
+summary_for_report+=$(format_test_status_for_file "Formatowanie (Spotless)" "$FORMATTING_STATUS" "")"\n"
+summary_for_report+=$(format_test_status_for_file "Testy Jednostkowe" "$UNIT_TESTS_STATUS" "$unit_test_details")"\n\n"
+summary_for_report+=$(echo -e "$FINAL_STATUS_MESSAGE" | sed 's/\x1b\[[0-9;]*m//g')"\n"
+
+echo -e "$summary_for_report" > "$report_file_name"
+log_message "INFO" "Pełne podsumowanie zapisane do: $report_file_name"
+
+log_message "INFO" "Diagnostyka zakończona!"
+
+if [[ $critical_issues_count -eq 0 ]]; then
+    exit 0
+else
+    exit 1
+fi

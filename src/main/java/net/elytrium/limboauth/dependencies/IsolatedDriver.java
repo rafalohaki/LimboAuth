@@ -1,20 +1,3 @@
-/*
- * Copyright (C) 2021 - 2025 Elytrium
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
 package net.elytrium.limboauth.dependencies;
 
 import java.sql.Connection;
@@ -25,23 +8,51 @@ import java.sql.SQLFeatureNotSupportedException;
 import java.util.Properties;
 import java.util.logging.Logger;
 
+/**
+ * A wrapper around a standard JDBC {@link Driver} that allows it to be registered with a custom URL
+ * prefix. This enables the use of multiple versions or types of JDBC drivers that might otherwise
+ * conflict if registered directly with {@link java.sql.DriverManager}. The {@code IsolatedDriver}
+ * delegates calls to the "original" driver after stripping its custom URL prefix.
+ */
 public class IsolatedDriver implements Driver {
 
   private final String initializer;
   private Driver original;
 
+  /**
+   * Constructs an IsolatedDriver with a specific URL initializer prefix.
+   *
+   * @param initializer The custom URL prefix (e.g., "jdbc:limboauth_h2:"). Connection URLs starting
+   *     with this prefix will be handled by this driver.
+   */
+  /** Default constructor. */
   public IsolatedDriver(String initializer) {
     this.initializer = initializer;
   }
 
+  /**
+   * Gets the URL initializer prefix for this driver.
+   *
+   * @return The initializer string.
+   */
   public String getInitializer() {
     return this.initializer;
   }
 
+  /**
+   * Gets the original, wrapped JDBC driver.
+   *
+   * @return The original {@link Driver} instance.
+   */
   public Driver getOriginal() {
     return this.original;
   }
 
+  /**
+   * Sets the original JDBC driver to be wrapped.
+   *
+   * @param driver The {@link Driver} to wrap.
+   */
   public void setOriginal(Driver driver) {
     this.original = driver;
   }
@@ -51,7 +62,6 @@ public class IsolatedDriver implements Driver {
     if (url.startsWith(this.initializer)) {
       return this.original.connect(url.substring(this.initializer.length()), info);
     }
-
     return null;
   }
 
@@ -61,10 +71,8 @@ public class IsolatedDriver implements Driver {
       if (this.original == null) {
         return false;
       }
-
       return this.original.acceptsURL(url.substring(this.initializer.length()));
     }
-
     return false;
   }
 
@@ -73,7 +81,6 @@ public class IsolatedDriver implements Driver {
     if (url.startsWith(this.initializer)) {
       return this.original.getPropertyInfo(url.substring(this.initializer.length()), info);
     }
-
     return new DriverPropertyInfo[0];
   }
 

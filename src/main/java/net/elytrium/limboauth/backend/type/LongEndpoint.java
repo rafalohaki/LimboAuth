@@ -1,58 +1,72 @@
-/*
- * Copyright (C) 2021 - 2025 Elytrium
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
 package net.elytrium.limboauth.backend.type;
 
 import com.google.common.io.ByteArrayDataInput;
 import com.google.common.io.ByteArrayDataOutput;
-import java.util.function.Function;
 import net.elytrium.limboauth.LimboAuth;
 import net.elytrium.limboauth.backend.Endpoint;
 
+/**
+ * An endpoint that represents a long value. This can be used for predefined long values or as a
+ * base for database-driven long values.
+ */
 public class LongEndpoint extends Endpoint {
 
-  private Function<String, Long> function;
-  private long value;
+  /** The long value stored by this endpoint. */
+  protected long value; // Zmieniono na protected
 
-  public LongEndpoint(LimboAuth plugin, String type, Function<String, Long> function) {
-    super(plugin, type, null);
-    this.function = function;
-  }
-
+  /**
+   * Constructs a LongEndpoint with a predefined value.
+   *
+   * @param plugin The main LimboAuth plugin instance.
+   * @param type The type identifier of this endpoint.
+   * @param username The username this endpoint pertains to.
+   * @param value The long value for this endpoint.
+   */
+  /** Default constructor. */
   public LongEndpoint(LimboAuth plugin, String type, String username, long value) {
     super(plugin, type, username);
     this.value = value;
   }
 
+  /**
+   * Writes the long value to the output stream.
+   *
+   * @param output The output stream to write to.
+   */
   @Override
   public void writeContents(ByteArrayDataOutput output) {
     output.writeLong(this.value);
   }
 
+  /**
+   * Reads content for the LongEndpoint. For basic LongEndpoints, this is typically empty as the
+   * value is set at construction.
+   *
+   * @param input The input stream to read from.
+   */
   @Override
   public void readContents(ByteArrayDataInput input) {
-    this.value = this.function.apply(this.username);
+    // Zwykle puste dla LongEndpoint, chyba że dane są przekazywane dodatkowo.
+    // Jeśli `function` byłoby używane, to tutaj: this.value = this.function.apply(this.username);
+    // Ale w obecnej strukturze, wartość jest ustawiana przez konstruktor lub LongDatabaseEndpoint.
   }
 
+  /**
+   * Sets the long value for this endpoint.
+   *
+   * @param value The new long value.
+   */
+  protected void setValue(long value) {
+    this.value = value;
+  }
+
+  /**
+   * Returns a string representation of the LongEndpoint.
+   *
+   * @return A string representation including username and value.
+   */
   @Override
   public String toString() {
-    return "LongEndpoint{"
-        + "username='" + this.username + '\''
-        + ", value=" + this.value
-        + '}';
+    return "LongEndpoint{" + "username='" + this.username + '\'' + ", value=" + this.value + '}';
   }
 }

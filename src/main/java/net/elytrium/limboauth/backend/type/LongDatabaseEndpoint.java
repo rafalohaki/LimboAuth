@@ -1,41 +1,55 @@
-/*
- * Copyright (C) 2021 - 2025 Elytrium
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
 package net.elytrium.limboauth.backend.type;
 
 import java.util.function.Function;
 import net.elytrium.limboauth.LimboAuth;
-import net.elytrium.limboauth.handler.AuthSessionHandler;
 import net.elytrium.limboauth.model.RegisteredPlayer;
+import net.elytrium.limboauth.service.DatabaseService;
+import org.slf4j.Logger;
 
+/**
+ * An endpoint that retrieves a long value from the database for a specific player. The value is
+ * determined by the provided dataExtractor function.
+ */
 public class LongDatabaseEndpoint extends LongEndpoint {
+  private final DatabaseService databaseService;
+  private final Logger logger;
 
-  public LongDatabaseEndpoint(LimboAuth plugin, String type, String username, long value) {
-    super(plugin, type, username, value);
-  }
+  /**
+   * Constructs a LongDatabaseEndpoint. It fetches player data from the database and applies the
+   * dataExtractor to get the long value. If the player is not found or an error occurs, {@link
+   * Long#MIN_VALUE} is set.
+   *
+   * @param plugin The main LimboAuth plugin instance.
+   * @param type The type identifier of this endpoint.
+   * @param username The username of the player to fetch data for.
+   * @param dataExtractor A function to extract the long value from a {@link RegisteredPlayer}
+   *     object.
+   */
+  public LongDatabaseEndpoint(
+      LimboAuth plugin,
+      String type,
+      String username,
+      Function<RegisteredPlayer, Long> dataExtractor) {
+    super(plugin, type, username, 0L); // Wywołaj konstruktor klasy bazowej
+    this.databaseService = this.plugin.getDatabaseService();
+    this.logger = this.plugin.getLogger();
 
-  public LongDatabaseEndpoint(LimboAuth plugin, String type, Function<RegisteredPlayer, Long> function) {
-    super(plugin, type, username -> {
-      RegisteredPlayer player = AuthSessionHandler.fetchInfo(plugin.getPlayerDao(), username);
-      if (player == null) {
-        return Long.MIN_VALUE;
-      } else {
-        return function.apply(player);
+    RegisteredPlayer player =
+        this.databaseService.findPlayerByLowercaseNickname(username.toLowerCase());
+    if (player == null) {
+      this.setValue(Long.MIN_VALUE); // Użyj settera z klasy bazowej
+      this.logger.debug("LongDatabaseEndpoint: Player {} not found for type {}.", username, type);
+    } else {
+      try {
+        this.setValue(dataExtractor.apply(player)); // Użyj settera z klasy bazowej
+      } catch (Exception e) {
+        this.logger.error(
+            "LongDatabaseEndpoint: Error extracting data for player {} type {}:",
+            username,
+            type,
+            e);
+        this.setValue(Long.MIN_VALUE); // Użyj settera z klasy bazowej
       }
-    });
+    }
   }
 }

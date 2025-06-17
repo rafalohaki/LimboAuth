@@ -1,92 +1,124 @@
-/*
- * Copyright (C) 2021 - 2025 Elytrium
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
 package net.elytrium.limboauth.command;
 
-import com.j256.ormlite.dao.Dao;
 import com.velocitypowered.api.command.CommandSource;
 import com.velocitypowered.api.command.SimpleCommand;
-import java.sql.SQLException;
 import java.text.MessageFormat;
 import java.util.Locale;
+import java.util.regex.Pattern;
 import net.elytrium.commons.kyori.serialization.Serializer;
 import net.elytrium.limboauth.LimboAuth;
 import net.elytrium.limboauth.Settings;
 import net.elytrium.limboauth.model.RegisteredPlayer;
 import net.elytrium.limboauth.model.SQLRuntimeException;
+import net.elytrium.limboauth.service.ConfigManager;
+import net.elytrium.limboauth.service.DatabaseService;
 import net.kyori.adventure.text.Component;
+import org.slf4j.Logger;
 
+/**
+ * Admin command to forcibly register a new player account. Handles nickname validation, password
+ * validation, and database creation.
+ */
 public class ForceRegisterCommand extends RatelimitedCommand {
 
+  private final DatabaseService databaseService;
   private final LimboAuth plugin;
-  private final Dao<RegisteredPlayer, String> playerDao;
+  // Usunięto pole nicknameValidationPattern, będziemy pobierać z ConfigManager
+  private final Logger logger;
 
-  private final String successful;
-  private final String notSuccessful;
-  private final Component usage;
-  private final Component takenNickname;
-  private final Component incorrectNickname;
-
-  public ForceRegisterCommand(LimboAuth plugin, Dao<RegisteredPlayer, String> playerDao) {
+  /**
+   * Constructs the ForceRegisterCommand.
+   *
+   * @param plugin The main LimboAuth plugin instance, used for logger access.
+   * @param databaseService Service for database interactions.
+   * @param configManager Service for accessing configuration.
+   */
+  public ForceRegisterCommand(
+      LimboAuth plugin, DatabaseService databaseService, ConfigManager configManager) {
+    super(configManager);
     this.plugin = plugin;
-    this.playerDao = playerDao;
-
-    this.successful = Settings.IMP.MAIN.STRINGS.FORCE_REGISTER_SUCCESSFUL;
-    this.notSuccessful = Settings.IMP.MAIN.STRINGS.FORCE_REGISTER_NOT_SUCCESSFUL;
-    this.usage = LimboAuth.getSerializer().deserialize(Settings.IMP.MAIN.STRINGS.FORCE_REGISTER_USAGE);
-    this.takenNickname = LimboAuth.getSerializer().deserialize(Settings.IMP.MAIN.STRINGS.FORCE_REGISTER_TAKEN_NICKNAME);
-    this.incorrectNickname = LimboAuth.getSerializer().deserialize(Settings.IMP.MAIN.STRINGS.FORCE_REGISTER_INCORRECT_NICKNAME);
+    this.databaseService = databaseService;
+    this.logger = this.plugin.getLogger();
   }
 
   @Override
-  public void execute(CommandSource source, String[] args) {
-    if (args.length == 2) {
-      String nickname = args[0];
-      String password = args[1];
+  protected void execute(
+      CommandSource source, String[] args, Component ratelimitedMessageComponent) {
+    Settings currentSettings = this.configManager.getSettings();
+    Serializer currentSerializer = this.configManager.getSerializer();
+    Pattern nicknamePattern =
+        this.configManager.getNicknameValidationPattern(); // Pobierz pattern z ConfigManager
 
-      Serializer serializer = LimboAuth.getSerializer();
-      try {
-        if (!this.plugin.getNicknameValidationPattern().matcher(nickname).matches()) {
-          source.sendMessage(this.incorrectNickname);
-          return;
-        }
+    final Component usageMsg =
+        currentSerializer.deserialize(currentSettings.MAIN.STRINGS.FORCE_REGISTER_USAGE);
+    final Component incorrectNicknameMsg =
+        currentSerializer.deserialize(
+            currentSettings.MAIN.STRINGS.FORCE_REGISTER_INCORRECT_NICKNAME);
+    final Component takenNicknameMsg =
+        currentSerializer.deserialize(currentSettings.MAIN.STRINGS.FORCE_REGISTER_TAKEN_NICKNAME);
+    final String successfulFormat = currentSettings.MAIN.STRINGS.FORCE_REGISTER_SUCCESSFUL;
+    final String notSuccessfulFormat = currentSettings.MAIN.STRINGS.FORCE_REGISTER_NOT_SUCCESSFUL;
+    final Component errorOccurredMsg =
+        currentSerializer.deserialize(currentSettings.MAIN.STRINGS.ERROR_OCCURRED);
 
-        String lowercaseNickname = nickname.toLowerCase(Locale.ROOT);
-        if (this.playerDao.idExists(lowercaseNickname)) {
-          source.sendMessage(this.takenNickname);
-          return;
-        }
+    if (args.length != 2) {
+      source.sendMessage(usageMsg);
+      return;
+    }
 
-        RegisteredPlayer player = new RegisteredPlayer(nickname, "", "").setPassword(password);
-        this.playerDao.create(player);
+    String nickname = args[0];
+    String password = args[1];
 
-        source.sendMessage(serializer.deserialize(MessageFormat.format(this.successful, nickname)));
-      } catch (SQLException e) {
-        source.sendMessage(serializer.deserialize(MessageFormat.format(this.notSuccessful, nickname)));
-        throw new SQLRuntimeException(e);
-      }
-    } else {
-      source.sendMessage(this.usage);
+    if (!nicknamePattern.matcher(nickname).matches()) { // Użyj pobranego patternu
+      source.sendMessage(incorrectNicknameMsg);
+      return;
+    }
+
+    String lowercaseNickname = nickname.toLowerCase(Locale.ROOT);
+    if (databaseService.findPlayerByLowercaseNickname(lowercaseNickname) != null) {
+      source.sendMessage(takenNicknameMsg);
+      return;
+    }
+
+    if (password.length() < currentSettings.MAIN.MIN_PASSWORD_LENGTH) {
+      source.sendMessage(
+          currentSerializer.deserialize(currentSettings.MAIN.STRINGS.REGISTER_PASSWORD_TOO_SHORT));
+      return;
+    }
+    if (password.length() > currentSettings.MAIN.MAX_PASSWORD_LENGTH) {
+      source.sendMessage(
+          currentSerializer.deserialize(currentSettings.MAIN.STRINGS.REGISTER_PASSWORD_TOO_LONG));
+      return;
+    }
+    // Użyj publicznego pola unsafePasswords z ConfigManager
+    if (currentSettings.MAIN.CHECK_PASSWORD_STRENGTH
+        && this.configManager.unsafePasswords.contains(password)) {
+      source.sendMessage(
+          currentSerializer.deserialize(currentSettings.MAIN.STRINGS.REGISTER_PASSWORD_UNSAFE));
+      return;
+    }
+
+    try {
+      RegisteredPlayer player = new RegisteredPlayer(nickname, "", "");
+      player.setPassword(password);
+      this.databaseService.createPlayer(player);
+      source.sendMessage(
+          currentSerializer.deserialize(MessageFormat.format(successfulFormat, nickname)));
+    } catch (SQLRuntimeException e) {
+      this.logger.error("SQL error during force register for {}:", nickname, e);
+      source.sendMessage(
+          currentSerializer.deserialize(MessageFormat.format(notSuccessfulFormat, nickname)));
+    } catch (Exception e) {
+      this.logger.error("Unexpected error during force register for {}:", nickname, e);
+      source.sendMessage(errorOccurredMsg);
     }
   }
 
   @Override
   public boolean hasPermission(SimpleCommand.Invocation invocation) {
-    return Settings.IMP.MAIN.COMMAND_PERMISSION_STATE.FORCE_REGISTER
+    return this.configManager
+        .getCommandPermissionState()
+        .FORCE_REGISTER
         .hasPermission(invocation.source(), "limboauth.admin.forceregister");
   }
 }

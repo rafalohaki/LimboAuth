@@ -1,29 +1,22 @@
-/*
- * Copyright (C) 2021 - 2025 Elytrium
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
 package net.elytrium.limboauth.command;
 
 import com.velocitypowered.api.permission.PermissionSubject;
 import com.velocitypowered.api.permission.Tristate;
 import java.util.function.BiFunction;
 
+/**
+ * Enum representing the permission state for a command. This determines how command access is
+ * checked based on configuration and player permissions.
+ */
 public enum CommandPermissionState {
+  /** Command is always disallowed. */
   FALSE((source, permission) -> false),
+  /**
+   * Command is allowed if the player does not have the permission set to false (effectively
+   * public).
+   */
   TRUE((source, permission) -> source.getPermissionValue(permission) != Tristate.FALSE),
+  /** Command is allowed only if the player explicitly has the specified permission. */
   PERMISSION(PermissionSubject::hasPermission);
 
   private final BiFunction<PermissionSubject, String, Boolean> hasPermissionFunction;
@@ -32,6 +25,13 @@ public enum CommandPermissionState {
     this.hasPermissionFunction = hasPermissionFunction;
   }
 
+  /**
+   * Checks if the given {@link PermissionSubject} has permission according to this state.
+   *
+   * @param permissionSubject The subject (e.g., player or console) to check.
+   * @param permission The permission string to check against if state is {@code PERMISSION}.
+   * @return {@code true} if the subject has permission, {@code false} otherwise.
+   */
   public boolean hasPermission(PermissionSubject permissionSubject, String permission) {
     return this.hasPermissionFunction.apply(permissionSubject, permission);
   }

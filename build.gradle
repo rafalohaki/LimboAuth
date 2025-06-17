@@ -1,12 +1,16 @@
 //file:noinspection GroovyAssignabilityCheck
 
+import com.github.spotbugs.snom.Effort
+import com.github.spotbugs.snom.Confidence
+
 plugins {
     id("java")
     id("checkstyle")
     id("maven-publish")
     id("com.github.spotbugs").version("6.1.7")
-    id("org.cadixdev.licenser").version("0.6.1")
     id("com.gradleup.shadow").version("8.3.6")
+    id("com.diffplug.spotless").version("7.0.0")
+    id("org.openrewrite.rewrite").version("7.8.0")
 }
 
 setGroup("net.elytrium")
@@ -68,6 +72,63 @@ dependencies {
     compileOnly("com.github.spotbugs:spotbugs-annotations:$spotbugsVersion")
 }
 
+// Konfiguracja Spotless dla automatycznego formatowania
+spotless {
+    java {
+        target fileTree('.') {
+            include '**/*.java'
+            exclude '**/build/**', '**/build-*/**', '**/generated/**'
+        }
+
+        // Formatowanie zgodne z projektem
+        indentWithSpaces(2)
+        trimTrailingWhitespace()
+        endWithNewline()
+        removeUnusedImports()
+
+        // Poprawna kolejność importów
+        importOrder(
+                'java',
+                'javax',
+                'com',
+                'net',
+                'org',
+                ''
+                )
+
+        // Używamy Google Java Format dla spójności
+        googleJavaFormat('1.22.0')
+
+        // Dodatkowe formatowanie adnotacji
+        formatAnnotations()
+
+        // Niestandardowe reguły dla prefiksu this.
+        custom 'addThisPrefix', {
+            it.replaceAll(/(\s+)(logger|plugin|server|configManager|databaseService)\./,
+                    '$1this.$2.')
+        }
+    }
+
+    // Formatowanie plików Gradle
+    groovyGradle {
+        target '*.gradle', '*.gradle.kts'
+        greclipse()
+        indentWithSpaces(4)
+        trimTrailingWhitespace()
+        endWithNewline()
+    }
+}
+
+// Konfiguracja OpenRewrite dla naprawy problemów Checkstyle
+rewrite {
+    activeRecipe(
+            'org.openrewrite.java.format.AutoFormat',
+            'org.openrewrite.java.RemoveUnusedImports',
+            'org.openrewrite.java.format.TabsAndIndents',
+            'org.openrewrite.java.format.EmptyNewlineAtEndOfFile'
+            )
+}
+
 shadowJar {
     getArchiveClassifier().set("")
 
@@ -119,42 +180,49 @@ shadowJar {
     relocate("net.elytrium.commons.config", "net.elytrium.limboapi.thirdparty.commons.config")
 }
 
-license {
-    setHeader(file("HEADER.txt"))
-}
-
+// Konfiguracja Checkstyle
 checkstyle {
-    setToolVersion("10.1")
-    setConfigFile(file("${this.getRootDir()}/config/checkstyle/checkstyle.xml"))
-    setConfigProperties("configDirectory": "${this.getRootDir()}/config/checkstyle")
+    setToolVersion("10.12.4")
+    setConfigFile(file("${rootDir}/config/checkstyle/checkstyle.xml"))
+    setConfigProperties(["configDirectory": "${rootDir}/config/checkstyle"])
 
-    // The build should immediately fail if we have errors.
+    // Build powinien natychmiast zawieść przy błędach
     setMaxErrors(0)
     setMaxWarnings(0)
+    setIgnoreFailures(false)
+}
+
+// Konfiguracja SpotBugs (NAPRAWIONA - używa valueOf() dla Groovy DSL)
+spotbugs {
+    ignoreFailures = false
+    effort = Effort.valueOf('MAX')          // ✅ POPRAWKA: valueOf() dla Groovy DSL
+    reportLevel = Confidence.valueOf('LOW') // ✅ POPRAWKA: valueOf() dla Groovy DSL
+    excludeFilter = file("${rootDir}/config/spotbugs/suppressions.xml")
 }
 
 spotbugsMain {
-    setExcludeFilter(file("${this.getRootDir()}/config/spotbugs/suppressions.xml"))
-
     reports {
         html {
             getRequired().set(true)
-            getOutputLocation().set(file("${this.getBuildDir()}/reports/spotbugs/main/spotbugs.html"))
+            getOutputLocation().set(file("${buildDir}/reports/spotbugs/main/spotbugs.html"))
             setStylesheet("fancy-hist.xsl")
         }
+        xml.enabled = false
     }
 }
 
-task javadocJar(type: Jar) {
+// Zadania JAR
+tasks.register('javadocJar', Jar) {
     getArchiveClassifier().set("javadoc")
     from(javadoc)
 }
 
-task sourcesJar(type: Jar) {
+tasks.register('sourcesJar', Jar) {
     getArchiveClassifier().set("sources")
     from(sourceSets.main.getAllSource())
 }
 
+// Konfiguracja publikowania
 publishing {
     repositories {
         maven {
@@ -170,7 +238,7 @@ publishing {
 
     publications {
         maven(MavenPublication) {
-            from(getComponents().java)
+            from(components.shadow)
 
             artifact(javadocJar)
             artifact(sourcesJar)
@@ -178,13 +246,14 @@ publishing {
     }
 }
 
+// Konfiguracja Javadoc
 javadoc {
     getOptions().setEncoding("UTF-8")
     getOptions().setCharSet("UTF-8")
     getOptions().setSource("17")
-    getOptions().links("https://docs.oracle.com/en/java/javase/11/docs/api/")
+    getOptions().links("https://docs.oracle.com/en/java/javase/17/docs/api/")
 
-    // Remove "undefined" from search paths when generating javadoc for a non-modular project. (JDK-8215291)
+    // Usuń "undefined" ze ścieżek wyszukiwania dla projektów nie-modularnych (JDK-8215291)
     if (JavaVersion.current() == JavaVersion.VERSION_11) {
         getOptions().addBooleanOption("-no-module-directories", true)
     }
@@ -195,32 +264,91 @@ artifacts {
     archives(sourcesJar)
 }
 
-sourceSets.main.getJava().srcDir(
-        getTasks().register("generateTemplates", Copy) {
-            task -> {
-                String version = getVersion().contains("-") ? "${getVersion()} (git-${getCurrentShortRevision()})" : getVersion()
-                task.getInputs().properties("version": version)
-                task.from(file("src/main/templates")).into(getLayout().getBuildDirectory().dir("generated/sources/templates"))
-                task.expand("version": version)
-            }
-        }.map {
-            it.getOutputs()
-        }
-)
+// Generowanie szablonów (naprawione)
+def generateTemplates = tasks.register("generateTemplates", Copy) {
+    String currentVersion = project.version.toString()
+    String evaluatedVersion = currentVersion.contains("-") ?
+            "${currentVersion} (git-${getCurrentShortRevision()})" : currentVersion
 
+    inputs.property("version", evaluatedVersion)
+    from(file("src/main/templates"))
+    into(layout.buildDirectory.dir("generated/sources/templates/java/main"))
+    expand(version: evaluatedVersion)
+}
+
+sourceSets.main.java.srcDir(generateTemplates.map { it.outputs })
+
+// Dodaj automatyczne sprawdzanie formatowania do check
+check.dependsOn spotlessCheck
+
+// Zadania pomocnicze do formatowania
+tasks.register('formatCode') {
+    group = 'formatting'
+    description = 'Formatuje cały kod w projekcie'
+    dependsOn spotlessApply
+
+    doLast {
+        println "✨ Kod został sformatowany przy użyciu Spotless"
+    }
+}
+
+tasks.register('checkFormat') {
+    group = 'formatting'
+    description = 'Sprawdza formatowanie kodu bez naprawy'
+    dependsOn spotlessCheck
+
+    doLast {
+        println "📋 Sprawdzenie formatowania zakończone"
+    }
+}
+
+// Task do automatycznej naprawy wszystkich problemów
+tasks.register('fixAllIssues') {
+    group = 'formatting'
+    description = 'Naprawia wszystkie problemy formatowania i Checkstyle'
+    dependsOn 'rewriteRun', 'spotlessApply'
+
+    doLast {
+        println "🎉 Wszystkie problemy formatowania zostały naprawione!"
+        println "Uruchom './gradlew build' aby sprawdzić wyniki"
+    }
+}
+
+// Task pomocniczy do sprawdzenia jakości kodu
+tasks.register('checkCodeQuality') {
+    group = 'verification'
+    description = 'Sprawdza jakość kodu bez naprawy błędów'
+    dependsOn 'checkstyleMain', 'spotbugsMain', 'spotlessCheck'
+
+    doLast {
+        println "📊 Sprawdzenie jakości kodu zakończone"
+        println "Raporty dostępne w:"
+        println "  - Checkstyle: build/reports/checkstyle/main.html"
+        println "  - SpotBugs: build/reports/spotbugs/main/spotbugs.html"
+        println "  - Spotless: konsola powyżej"
+    }
+}
+
+// Zależności między zadaniami
 assemble.dependsOn(shadowJar)
 
+// Funkcja pomocnicza do pobierania wersji git
 String getCurrentShortRevision() {
     OutputStream outputStream = new ByteArrayOutputStream()
-    exec {
-        if (System.getProperty("os.name").toLowerCase().contains("win")) {
-            commandLine("cmd", "/c", "git rev-parse --short HEAD")
-        } else {
-            commandLine("bash", "-c", "git rev-parse --short HEAD")
+    try {
+        exec {
+            if (System.getProperty("os.name").toLowerCase().contains("win")) {
+                commandLine("cmd", "/c", "git rev-parse --short HEAD")
+            } else {
+                commandLine("bash", "-c", "git rev-parse --short HEAD")
+            }
+
+            setStandardOutput(outputStream)
+            setIgnoreExitValue(true)
         }
-
-        setStandardOutput(outputStream)
+        def result = outputStream.toString().trim()
+        return result.isEmpty() ? "unknown" : result
+    } catch (Exception ignored) {
+        return "unknown"
     }
-
-    return outputStream.toString().trim()
 }

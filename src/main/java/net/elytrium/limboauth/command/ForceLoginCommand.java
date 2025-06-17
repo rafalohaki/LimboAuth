@@ -1,87 +1,101 @@
-/*
- * Copyright (C) 2021 - 2025 Elytrium
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
 package net.elytrium.limboauth.command;
 
 import com.velocitypowered.api.command.CommandSource;
+import com.velocitypowered.api.command.SimpleCommand;
 import java.text.MessageFormat;
-import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 import net.elytrium.commons.kyori.serialization.Serializer;
 import net.elytrium.limboauth.LimboAuth;
 import net.elytrium.limboauth.Settings;
 import net.elytrium.limboauth.handler.AuthSessionHandler;
+import net.elytrium.limboauth.service.ConfigManager;
+import net.elytrium.limboauth.service.PlayerSessionService;
 import net.kyori.adventure.text.Component;
+import org.slf4j.Logger;
 
+/**
+ * Admin command to forcibly log in a player who is currently in the authentication process. This
+ * bypasses the normal password/2FA checks for that player.
+ */
 public class ForceLoginCommand extends RatelimitedCommand {
 
+  private final PlayerSessionService playerSessionService;
   private final LimboAuth plugin;
+  private final Logger logger;
 
-  private final String successful;
-  private final String unknownPlayer;
-  private final Component usage;
-
-  public ForceLoginCommand(LimboAuth plugin) {
+  /**
+   * Constructs the ForceLoginCommand.
+   *
+   * @param plugin The main LimboAuth plugin instance, used for logger access.
+   * @param playerSessionService Service for managing player authentication sessions.
+   * @param configManager Service for accessing configuration.
+   */
+  public ForceLoginCommand(
+      LimboAuth plugin, PlayerSessionService playerSessionService, ConfigManager configManager) {
+    super(configManager);
     this.plugin = plugin;
-
-    this.successful = Settings.IMP.MAIN.STRINGS.FORCE_LOGIN_SUCCESSFUL;
-    this.unknownPlayer = Settings.IMP.MAIN.STRINGS.FORCE_LOGIN_UNKNOWN_PLAYER;
-    this.usage = LimboAuth.getSerializer().deserialize(Settings.IMP.MAIN.STRINGS.FORCE_LOGIN_USAGE);
+    this.playerSessionService = playerSessionService;
+    this.logger = this.plugin.getLogger();
   }
 
   @Override
-  public void execute(CommandSource source, String[] args) {
-    if (args.length == 1) {
-      String nickname = args[0];
+  protected void execute(
+      CommandSource source, String[] args, Component ratelimitedMessageComponent) {
+    Settings currentSettings = this.configManager.getSettings();
+    Serializer currentSerializer = this.configManager.getSerializer();
 
-      Serializer serializer = LimboAuth.getSerializer();
-      AuthSessionHandler handler = this.plugin.getAuthenticatingPlayer(nickname);
-      if (handler == null) {
-        source.sendMessage(serializer.deserialize(MessageFormat.format(this.unknownPlayer, nickname)));
-        return;
-      }
+    final Component usageMsg =
+        currentSerializer.deserialize(currentSettings.MAIN.STRINGS.FORCE_LOGIN_USAGE);
+    final String unknownPlayerFormat = currentSettings.MAIN.STRINGS.FORCE_LOGIN_UNKNOWN_PLAYER;
+    final String successfulFormat = currentSettings.MAIN.STRINGS.FORCE_LOGIN_SUCCESSFUL;
+    final Component errorOccurredMsg =
+        currentSerializer.deserialize(currentSettings.MAIN.STRINGS.ERROR_OCCURRED);
 
-      handler.finishLogin();
-      source.sendMessage(serializer.deserialize(MessageFormat.format(this.successful, nickname)));
-    } else {
-      source.sendMessage(this.usage);
+    if (args.length != 1) {
+      source.sendMessage(usageMsg);
+      return;
+    }
+
+    String nickname = args[0];
+    AuthSessionHandler handler = this.playerSessionService.getAuthenticatingPlayer(nickname);
+
+    if (handler == null) {
+      source.sendMessage(
+          currentSerializer.deserialize(MessageFormat.format(unknownPlayerFormat, nickname)));
+      return;
+    }
+
+    try {
+      // Poprzednio było finishLogin(), ale triggerSuccessfulLoginSequence() jest bardziej
+      // odpowiednie,
+      // bo obsługuje eventy i inne kroki finalizacji logowania.
+      handler.triggerSuccessfulLoginSequence();
+      source.sendMessage(
+          currentSerializer.deserialize(MessageFormat.format(successfulFormat, nickname)));
+    } catch (Exception e) {
+      this.logger.error("Error during force login for {}:", nickname, e);
+      source.sendMessage(errorOccurredMsg);
     }
   }
 
   @Override
-  public boolean hasPermission(Invocation invocation) {
-    return Settings.IMP.MAIN.COMMAND_PERMISSION_STATE.FORCE_LOGIN
+  public boolean hasPermission(SimpleCommand.Invocation invocation) {
+    return this.configManager
+        .getCommandPermissionState()
+        .FORCE_LOGIN
         .hasPermission(invocation.source(), "limboauth.admin.forcelogin");
   }
 
   @Override
-  public List<String> suggest(Invocation invocation) {
+  public List<String> suggest(SimpleCommand.Invocation invocation) {
     if (invocation.arguments().length > 1) {
       return super.suggest(invocation);
     }
-
-    String nickname = invocation.arguments().length == 0 ? "" : invocation.arguments()[0];
-    List<String> suggest = new ArrayList<>();
-    for (String username : this.plugin.getAuthenticatingPlayers().keySet()) {
-      if (username.startsWith(nickname)) {
-        suggest.add(username);
-      }
-    }
-
-    return suggest;
+    String currentArg =
+        invocation.arguments().length == 0 ? "" : invocation.arguments()[0].toLowerCase();
+    return this.playerSessionService.getAuthenticatingPlayers().keySet().stream()
+        .filter(username -> username.toLowerCase().startsWith(currentArg))
+        .collect(Collectors.toList());
   }
 }

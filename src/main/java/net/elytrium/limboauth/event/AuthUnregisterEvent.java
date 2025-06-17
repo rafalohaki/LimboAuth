@@ -1,30 +1,29 @@
-/*
- * Copyright (C) 2021 - 2025 Elytrium
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
 package net.elytrium.limboauth.event;
 
+/**
+ * Event fired when a player is unregistered from the LimboAuth system. This event occurs before the
+ * player's data is actually removed from the database. It can be used to perform actions related to
+ * a player's unregistration, such as cleaning up data in other systems or logging the event.
+ */
 public class AuthUnregisterEvent {
 
   private final String nickname;
 
+  /**
+   * Constructs an AuthUnregisterEvent.
+   *
+   * @param nickname The nickname of the player being unregistered.
+   */
+  /** Default constructor. */
   public AuthUnregisterEvent(String nickname) {
     this.nickname = nickname;
   }
 
+  /**
+   * Gets the nickname of the player being unregistered.
+   *
+   * @return The player's nickname.
+   */
   public String getNickname() {
     return this.nickname;
   }

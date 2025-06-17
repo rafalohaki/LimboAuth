@@ -1,0 +1,409 @@
+'indentWithSpaces' is deprecated, use 'leadingTabsToSpaces' in your gradle build script instead.
+'indentWithSpaces' is deprecated, use 'leadingTabsToSpaces' in your gradle build script instead.
+> Task :clean
+> Task :generateTemplates
+
+> Task :compileJava
+Note: Some input files use or override a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+
+> Task :processResources
+> Task :classes
+> Task :jar
+
+> Task :javadoc
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/event/AuthUnregisterEvent.java:18: warning: no @param for nickname
+  public AuthUnregisterEvent(String nickname) {
+         ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/listener/BackendEndpointsListener.java:134: warning: no @param for plugin
+  public BackendEndpointsListener(LimboAuth plugin) {
+         ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/dependencies/BaseLibrary.java:17: warning: no comment
+  H2_V1("com.h2database", "h2", "1.4.200"),
+  ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/dependencies/BaseLibrary.java:18: warning: no comment
+  H2_V2("com.h2database", "h2", "2.3.232"),
+  ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/dependencies/BaseLibrary.java:20: warning: no comment
+  MARIADB("org.mariadb.jdbc", "mariadb-java-client", "3.1.4"),
+  ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/dependencies/BaseLibrary.java:19: warning: no comment
+  MYSQL("com.mysql", "mysql-connector-j", "8.0.33"),
+  ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/dependencies/BaseLibrary.java:21: warning: no comment
+  POSTGRESQL("org.postgresql", "postgresql", "42.5.1"),
+  ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/dependencies/BaseLibrary.java:22: warning: no comment
+  SQLITE("org.xerial", "sqlite-jdbc", "3.40.0.0");
+  ^
+/workspaces/LimboAuth/build/generated/sources/templates/java/main/net/elytrium/limboauth/BuildConstants.java:24: warning: use of default constructor, which does not provide a comment
+public class BuildConstants {
+       ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/command/RatelimitedCommand.java:25: warning: no @param for configManager
+  public RatelimitedCommand(ConfigManager configManager) {
+         ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/service/CommandRegistry.java:28: warning: no comment
+  public CommandRegistry(
+         ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/service/CommandRegistry.java:54: warning: no comment
+  public void registerAllCommands() {
+              ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/service/CommandRegistry.java:124: warning: no comment
+  public void unregisterAllCommands() {
+              ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/service/ConfigManager.java:74: warning: no @param for logger
+  public ConfigManager(Logger logger) {
+         ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/service/ConfigManager.java:229: warning: no main description
+   * @return The current {@link Settings} instance.
+     ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/service/ConfigManager.java:236: warning: no main description
+   * @return The current {@link Serializer} instance for messages.
+     ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/service/ConfigManager.java:243: warning: no main description
+   * @return The compiled {@link Pattern} for nickname validation.
+     ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/service/ConfigManager.java:250: warning: no main description
+   * @return The plugin's data directory path.
+     ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/service/ConfigManager.java:257: warning: no main description
+   * @return The configured {@link Settings.MAIN.COMMAND_PERMISSION_STATE} for commands.
+     ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/service/ConfigManager.java:264: warning: no main description
+   * @return True if the backend API is enabled, false otherwise.
+     ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/service/ConfigManager.java:313: warning: no main description
+   * @return Milliseconds for general cache purging.
+     ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/service/ConfigManager.java:320: warning: no main description
+   * @return Milliseconds for premium cache purging.
+     ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/service/ConfigManager.java:327: warning: no main description
+   * @return Milliseconds for bruteforce cache purging.
+     ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/service/ConfigManager.java:334: warning: no main description
+   * @return True if Floodgate players need authentication.
+     ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/service/ConfigManager.java:341: warning: no main description
+   * @return Maximum bruteforce attempts allowed.
+     ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/service/ConfigManager.java:348: warning: no main description
+   * @return True if premium accounts should be saved in the database.
+     ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/service/ConfigManager.java:355: warning: no main description
+   * @return True if online-mode players need authentication.
+     ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/service/ConfigManager.java:362: warning: no main description
+   * @return True if new registrations are disabled.
+     ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/service/ConfigManager.java:369: warning: no main description
+   * @return True if client mod integration is enabled.
+     ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/service/ConfigManager.java:376: warning: no main description
+   * @return The verification key for client mod communication.
+     ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/service/ConfigManager.java:383: warning: no main description
+   * @return The URL for external premium authentication checks.
+     ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/service/ConfigManager.java:390: warning: no main description
+   * @return List of HTTP status codes indicating a rate limit from the premium check API.
+     ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/service/ConfigManager.java:397: warning: no main description
+   * @return List of HTTP status codes indicating a user does not exist from the premium check API.
+     ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/service/ConfigManager.java:404: warning: no main description
+   * @return List of HTTP status codes indicating a user exists from the premium check API.
+     ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/service/ConfigManager.java:411: warning: no main description
+   * @return List of JSON fields to validate in the response when a user exists.
+     ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/service/ConfigManager.java:418: warning: no main description
+   * @return The JSON field name containing the UUID in the premium check response.
+     ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/service/ConfigManager.java:425: warning: no main description
+   * @return List of JSON fields to validate in the response when a user does not exist.
+     ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/service/ConfigManager.java:432: warning: no main description
+   * @return True if players should be treated as premium on API rate limit, false for cracked.
+     ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/service/ConfigManager.java:439: warning: no main description
+   * @return True if players should be treated as premium on API server error, false for cracked.
+     ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/service/ConfigManager.java:446: warning: no main description
+   * @return List of enabled backend API endpoint names.
+     ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/dependencies/DatabaseLibrary.java:290: warning: no @throws for java.lang.ReflectiveOperationException
+    Connection connect(ClassLoader classLoader, Path dir, String jdbc, String user, String password)
+               ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/dependencies/DatabaseLibrary.java:290: warning: no @throws for java.io.IOException
+    Connection connect(ClassLoader classLoader, Path dir, String jdbc, String user, String password)
+               ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/service/DatabaseService.java:49: warning: no @param for logger
+  public DatabaseService(Logger logger) {
+         ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/backend/Endpoint.java:30: warning: no @param for plugin
+  public Endpoint(LimboAuth plugin) {
+         ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/backend/Endpoint.java:42: warning: no @param for plugin
+  public Endpoint(LimboAuth plugin, String type, String username) {
+         ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/backend/Endpoint.java:42: warning: no @param for type
+  public Endpoint(LimboAuth plugin, String type, String username) {
+         ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/backend/Endpoint.java:42: warning: no @param for username
+  public Endpoint(LimboAuth plugin, String type, String username) {
+         ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/dependencies/IsolatedClassLoader.java:21: warning: no @param for urls
+  public IsolatedClassLoader(URL[] urls) {
+         ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/dependencies/IsolatedDriver.java:29: warning: no @param for initializer
+  public IsolatedDriver(String initializer) {
+         ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/LimboAuth.java:433: warning: no @param for checkTime
+    public CachedUser(long checkTime) {
+           ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/LimboAuth.java:540: warning: no @param for checkTime
+    public CachedBruteforceUser(long checkTime) {
+           ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/LimboAuth.java:497: warning: no @param for checkTime
+    public CachedPremiumUser(long checkTime, boolean premium) {
+           ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/LimboAuth.java:497: warning: no @param for premium
+    public CachedPremiumUser(long checkTime, boolean premium) {
+           ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/LimboAuth.java:460: warning: no @param for checkTime
+    public CachedSessionUser(long checkTime, InetAddress inetAddress, String username) {
+           ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/LimboAuth.java:460: warning: no @param for inetAddress
+    public CachedSessionUser(long checkTime, InetAddress inetAddress, String username) {
+           ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/LimboAuth.java:460: warning: no @param for username
+    public CachedSessionUser(long checkTime, InetAddress inetAddress, String username) {
+           ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/LimboAuth.java:571: warning: no @param for state
+    public PremiumResponse(PremiumState state) {
+           ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/LimboAuth.java:582: warning: no @param for state
+    public PremiumResponse(PremiumState state, UUID uuid) {
+           ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/LimboAuth.java:582: warning: no @param for uuid
+    public PremiumResponse(PremiumState state, UUID uuid) {
+           ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/LimboAuth.java:595: warning: no @param for state
+    public PremiumResponse(PremiumState state, String uuidStr) {
+           ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/LimboAuth.java:595: warning: no @param for uuidStr
+    public PremiumResponse(PremiumState state, String uuidStr) {
+           ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/command/LimboAuthCommand.java:42: warning: no @param for plugin
+  public LimboAuthCommand(LimboAuth plugin, ConfigManager configManager) {
+         ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/command/LimboAuthCommand.java:42: warning: no @param for configManager
+  public LimboAuthCommand(LimboAuth plugin, ConfigManager configManager) {
+         ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/service/LimboServerFacade.java:291: warning: no main description
+   * @return The current {@link Limbo} instance for authentication.
+     ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/service/LimboServerFacade.java:298: warning: no main description
+   * @return The current {@link VirtualWorld} used for authentication.
+     ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/service/LimboServerFacade.java:305: warning: no main description
+   * @return True if the Limbo server and its ServerInfo are initialized.
+     ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/service/LimboServerFacade.java:312: warning: no main description
+   * @return The {@link ServerInfo} for the authentication Limbo this.server.
+     ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/command/LoginCommand.java:31: warning: no comment
+  public LoginCommand(
+         ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/backend/type/LongEndpoint.java:26: warning: no @param for plugin
+  public LongEndpoint(LimboAuth plugin, String type, String username, long value) {
+         ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/backend/type/LongEndpoint.java:26: warning: no @param for type
+  public LongEndpoint(LimboAuth plugin, String type, String username, long value) {
+         ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/backend/type/LongEndpoint.java:26: warning: no @param for username
+  public LongEndpoint(LimboAuth plugin, String type, String username, long value) {
+         ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/backend/type/LongEndpoint.java:26: warning: no @param for value
+  public LongEndpoint(LimboAuth plugin, String type, String username, long value) {
+         ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/event/TaskEvent.java:32: warning: no @param for onComplete
+  public TaskEvent(Consumer<TaskEvent> onComplete) {
+         ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/event/TaskEvent.java:45: warning: no @param for onComplete
+  public TaskEvent(Consumer<TaskEvent> onComplete, Result result) {
+         ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/event/TaskEvent.java:45: warning: no @param for result
+  public TaskEvent(Consumer<TaskEvent> onComplete, Result result) {
+         ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/event/PreRegisterEvent.java:28: warning: no @param for onComplete
+  public PreRegisterEvent(Consumer<TaskEvent> onComplete, Result result, Player player) {
+         ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/event/PreRegisterEvent.java:28: warning: no @param for result
+  public PreRegisterEvent(Consumer<TaskEvent> onComplete, Result result, Player player) {
+         ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/event/PreRegisterEvent.java:28: warning: no @param for player
+  public PreRegisterEvent(Consumer<TaskEvent> onComplete, Result result, Player player) {
+         ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/command/RegisterCommand.java:36: warning: no comment
+  public RegisterCommand(
+         ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/model/RegisteredPlayer.java:143: warning: no @param for player
+  public RegisteredPlayer(Player player) {
+         ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/model/RegisteredPlayer.java:155: warning: no @param for nickname
+  public RegisteredPlayer(String nickname, UUID uuid, InetSocketAddress ip) {
+         ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/model/RegisteredPlayer.java:155: warning: no @param for uuid
+  public RegisteredPlayer(String nickname, UUID uuid, InetSocketAddress ip) {
+         ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/model/RegisteredPlayer.java:155: warning: no @param for ip
+  public RegisteredPlayer(String nickname, UUID uuid, InetSocketAddress ip) {
+         ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/model/RegisteredPlayer.java:167: warning: no @param for nickname
+  public RegisteredPlayer(String nickname, String uuid, String ip) {
+         ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/model/RegisteredPlayer.java:167: warning: no @param for uuid
+  public RegisteredPlayer(String nickname, String uuid, String ip) {
+         ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/model/RegisteredPlayer.java:167: warning: no @param for ip
+  public RegisteredPlayer(String nickname, String uuid, String ip) {
+         ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/model/RegisteredPlayer.java:201: warning: no main description
+   * @return The player's nickname.
+     ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/model/RegisteredPlayer.java:208: warning: no main description
+   * @return The player's nickname in lowercase.
+     ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/model/RegisteredPlayer.java:240: warning: no main description
+   * @return The player's password hash, or an empty string if null.
+     ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/model/RegisteredPlayer.java:258: warning: no main description
+   * @return The player's registration IP address, or an empty string if null.
+     ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/model/RegisteredPlayer.java:276: warning: no main description
+   * @return The player's TOTP secret token, or an empty string if null.
+     ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/model/RegisteredPlayer.java:294: warning: no main description
+   * @return The player's registration timestamp, or {@link Long#MIN_VALUE} if null.
+     ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/model/RegisteredPlayer.java:312: warning: no main description
+   * @return The player's primary UUID string, or an empty string if null.
+     ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/model/RegisteredPlayer.java:341: warning: no main description
+   * @return The player's premium UUID string, or an empty string if null.
+     ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/model/RegisteredPlayer.java:348: warning: no main description
+   * @return The player's last login IP address, or an empty string if null.
+     ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/model/RegisteredPlayer.java:366: warning: no main description
+   * @return The player's last login timestamp, or {@link Long#MIN_VALUE} if null.
+     ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/model/RegisteredPlayer.java:384: warning: no main description
+   * @return The timestamp when the current password hash or TOTP token was issued, or {@link
+     ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/Settings.java:32: warning: use of default constructor, which does not provide a comment
+public class Settings extends YamlConfig {
+       ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/Settings.java:783: warning: use of default constructor, which does not provide a comment
+  public static class DATABASE {
+                ^
+/workspaces/LimboAuth/src/main/java/net/elytrium/limboauth/Settings.java:72: warning: use of default constructor, which does not provide a comment
+  public static class MAIN {
+                ^
+100 warnings
+
+> Task :javadocJar
+> Task :compileTestJava NO-SOURCE
+> Task :shadowJar
+> Task :sourcesJar
+> Task :assemble
+> Task :processTestResources NO-SOURCE
+> Task :testClasses UP-TO-DATE
+> Task :checkstyleTest NO-SOURCE
+> Task :spotbugsTest NO-SOURCE
+> Task :spotlessInternalRegisterDependencies
+
+> Task :spotlessGroovyGradle
+Missing required bundle org.eclipse.jdt.debug needed by [org.eclipse.jdt.launching, org.eclipse.jdt.launching.macosx]
+Missing required capability osgi.extender:osgi.extender=osgi.serviceloader.processor needed by org.apache.commons.commons-logging
+Missing required capability osgi.serviceloader:osgi.serviceloader=org.apache.commons.logging.LogFactory needed by org.apache.commons.commons-logging
+Missing required capability osgi.serviceloader:osgi.serviceloader=org.apache.juli.logging.Log needed by org.mortbay.jasper.apache-jsp
+Missing required capability osgi.extender:osgi.extender=osgi.serviceloader.processor needed by org.mortbay.jasper.apache-jsp
+Recommend setting osgi.configuration.area to a directory, getDataFile will return null
+Starting Groovy-Eclipse compiler resolver. Specified compiler level: unspecified
+129 org.codehaus.groovy_5.0.0.v202406302347-e2406 RESOLVED
+
+> Task :spotlessGroovyGradleCheck
+> Task :spotlessJava
+> Task :spotlessJavaCheck FAILED
+> Task :checkstyleMain
+> Task :spotbugsMain FAILED
+
+[Incubating] Problems report is available at: file:///workspaces/LimboAuth/build/reports/problems/problems-report.html
+
+FAILURE: Build completed with 2 failures.
+
+1: Task failed with an exception.
+-----------
+* What went wrong:
+Execution failed for task ':spotlessJavaCheck'.
+> The following files had format violations:
+      src/main/java/net/elytrium/limboauth/listener/BackendEndpointsListener.java
+          @@ -47,7 +47,7 @@
+           ····················"available_endpoints",
+           ····················usernameForEndpoint,
+           ····················//·Corrected:·Use·the·'plugin'·parameter·from·the·lambda
+          -····················String.join(",",·plugin.getConfigManager().getEnabledBackendEndpoints())));
+          +····················String.join(",",·this.plugin.getConfigManager().getEnabledBackendEndpoints())));
+           ····factories.put(
+           ········"premium_state",
+           ········plugin·->·//·'plugin'·to·instancja·LimboAuth
+          @@ -214,4 +214,4 @@
+           ····this.logger.debug(
+           ········"Sent·backend·API·response·to·{}",·serverConnection.getServerInfo().getName());
+           ··}
+          -}
+          +}
+      src/main/java/net/elytrium/limboauth/service/ConfigManager.java
+          @@ -280,7 +280,7 @@
+           ············()·->·{
+           ··············try·{
+           ················//·Corrected:·Use·the·'databaseService'·parameter
+          -················return·(int)·databaseService.getRegisteredPlayerCount();
+          +················return·(int)·this.databaseService.getRegisteredPlayerCount();
+           ··············}·catch·(Exception·e)·{·//·NOSONAR·-·bStats·should·not·crash·the·plugin
+           ················this.logger.error("Failed·to·get·registered·player·count·for·bStats",·e);
+           ················return·0;
+          @@ -448,4 +448,4 @@
+           ··public·List<String>·getEnabledBackendEndpoints()·{
+           ····return·settings.MAIN.BACKEND_API.ENABLED_ENDPOINTS;
+           ··}
+          -}
+          +}
+  Run './gradlew :spotlessApply' to fix these violations.
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+==============================================================================
+
+2: Task failed with an exception.
+-----------
+* What went wrong:
+Execution failed for task ':spotbugsMain'.
+> A failure occurred while executing com.github.spotbugs.snom.internal.SpotBugsRunnerForHybrid$SpotBugsExecutor
+   > Verification failed: SpotBugs ended with exit code 1. See the report at: file:///workspaces/LimboAuth/build/reports/spotbugs/main/spotbugs.html
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+==============================================================================
+
+BUILD FAILED in 22s
+16 actionable tasks: 16 executed

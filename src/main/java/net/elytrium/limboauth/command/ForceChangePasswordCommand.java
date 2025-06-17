@@ -1,28 +1,8 @@
-/*
- * Copyright (C) 2021 - 2025 Elytrium
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
 package net.elytrium.limboauth.command;
 
-import com.j256.ormlite.dao.Dao;
-import com.j256.ormlite.stmt.UpdateBuilder;
 import com.velocitypowered.api.command.CommandSource;
 import com.velocitypowered.api.command.SimpleCommand;
 import com.velocitypowered.api.proxy.ProxyServer;
-import java.sql.SQLException;
 import java.text.MessageFormat;
 import java.util.List;
 import java.util.Locale;
@@ -31,33 +11,47 @@ import net.elytrium.commons.velocity.commands.SuggestUtils;
 import net.elytrium.limboauth.LimboAuth;
 import net.elytrium.limboauth.Settings;
 import net.elytrium.limboauth.event.ChangePasswordEvent;
-import net.elytrium.limboauth.handler.AuthSessionHandler;
 import net.elytrium.limboauth.model.RegisteredPlayer;
 import net.elytrium.limboauth.model.SQLRuntimeException;
+import net.elytrium.limboauth.service.*;
 import net.kyori.adventure.text.Component;
+import org.slf4j.Logger;
 
+/**
+ * Admin command to forcibly change a player's password. Handles checks for player registration,
+ * updates database, invalidates session, and notifies the target player if online.
+ */
 public class ForceChangePasswordCommand extends RatelimitedCommand {
 
-  private final LimboAuth plugin;
-  private final ProxyServer server;
-  private final Dao<RegisteredPlayer, String> playerDao;
+  private final LimboAuth plugin; // For event manager & logger
+  private final Logger logger;
+  private final ProxyServer server; // For player suggestions and messaging
+  private final DatabaseService databaseService;
+  private final CacheManager cacheManager;
 
-  private final String message;
-  private final String successful;
-  private final String notSuccessful;
-  private final String notRegistered;
-  private final Component usage;
+  // ConfigManager is available via super.configManager
 
-  public ForceChangePasswordCommand(LimboAuth plugin, ProxyServer server, Dao<RegisteredPlayer, String> playerDao) {
+  /**
+   * Constructs the ForceChangePasswordCommand.
+   *
+   * @param plugin The main LimboAuth plugin instance.
+   * @param server The ProxyServer instance.
+   * @param configManager Service for accessing configuration.
+   * @param databaseService Service for database interactions.
+   * @param cacheManager Service for managing caches.
+   */
+  public ForceChangePasswordCommand(
+      LimboAuth plugin,
+      ProxyServer server,
+      ConfigManager configManager,
+      DatabaseService databaseService,
+      CacheManager cacheManager) {
+    super(configManager);
     this.plugin = plugin;
+    this.logger = this.plugin.getLogger();
     this.server = server;
-    this.playerDao = playerDao;
-
-    this.message = Settings.IMP.MAIN.STRINGS.FORCE_CHANGE_PASSWORD_MESSAGE;
-    this.successful = Settings.IMP.MAIN.STRINGS.FORCE_CHANGE_PASSWORD_SUCCESSFUL;
-    this.notSuccessful = Settings.IMP.MAIN.STRINGS.FORCE_CHANGE_PASSWORD_NOT_SUCCESSFUL;
-    this.notRegistered = Settings.IMP.MAIN.STRINGS.FORCE_CHANGE_PASSWORD_NOT_REGISTERED;
-    this.usage = LimboAuth.getSerializer().deserialize(Settings.IMP.MAIN.STRINGS.FORCE_CHANGE_PASSWORD_USAGE);
+    this.databaseService = databaseService;
+    this.cacheManager = cacheManager;
   }
 
   @Override
@@ -66,48 +60,92 @@ public class ForceChangePasswordCommand extends RatelimitedCommand {
   }
 
   @Override
-  public void execute(CommandSource source, String[] args) {
-    if (args.length == 2) {
-      String nickname = args[0];
-      String nicknameLowercased = args[0].toLowerCase(Locale.ROOT);
-      String newPassword = args[1];
+  protected void execute(
+      CommandSource source, String[] args, Component ratelimitedMessageComponent) {
+    Settings currentSettings = this.configManager.getSettings();
+    Serializer currentSerializer = this.configManager.getSerializer();
 
-      Serializer serializer = LimboAuth.getSerializer();
-      try {
-        RegisteredPlayer registeredPlayer = AuthSessionHandler.fetchInfoLowercased(this.playerDao, nicknameLowercased);
+    final Component usageMsg =
+        currentSerializer.deserialize(currentSettings.MAIN.STRINGS.FORCE_CHANGE_PASSWORD_USAGE);
 
-        if (registeredPlayer == null) {
-          source.sendMessage(serializer.deserialize(MessageFormat.format(this.notRegistered, nickname)));
-          return;
-        }
+    if (args.length != 2) {
+      source.sendMessage(usageMsg);
+      return;
+    }
 
-        final String oldHash = registeredPlayer.getHash();
-        final String newHash = RegisteredPlayer.genHash(newPassword);
+    String targetNickname = args[0];
+    String targetNicknameLowercased = targetNickname.toLowerCase(Locale.ROOT);
+    String newPassword = args[1];
 
-        UpdateBuilder<RegisteredPlayer, String> updateBuilder = this.playerDao.updateBuilder();
-        updateBuilder.where().eq(RegisteredPlayer.LOWERCASE_NICKNAME_FIELD, nicknameLowercased);
-        updateBuilder.updateColumnValue(RegisteredPlayer.HASH_FIELD, newHash);
-        updateBuilder.update();
+    final Component notRegisteredMsg =
+        currentSerializer.deserialize(
+            MessageFormat.format(
+                currentSettings.MAIN.STRINGS.FORCE_CHANGE_PASSWORD_NOT_REGISTERED, targetNickname));
+    final Component notSuccessfulMsg =
+        currentSerializer.deserialize(
+            MessageFormat.format(
+                currentSettings.MAIN.STRINGS.FORCE_CHANGE_PASSWORD_NOT_SUCCESSFUL, targetNickname));
+    final Component successfulMsg =
+        currentSerializer.deserialize(
+            MessageFormat.format(
+                currentSettings.MAIN.STRINGS.FORCE_CHANGE_PASSWORD_SUCCESSFUL, targetNickname));
+    final Component messageToPlayer =
+        currentSerializer.deserialize(
+            MessageFormat.format(
+                currentSettings.MAIN.STRINGS.FORCE_CHANGE_PASSWORD_MESSAGE, newPassword));
 
-        this.plugin.removePlayerFromCacheLowercased(nicknameLowercased);
-        this.server.getPlayer(nickname)
-            .ifPresent(player -> player.sendMessage(serializer.deserialize(MessageFormat.format(this.message, newPassword))));
+    try {
+      RegisteredPlayer registeredPlayer =
+          this.databaseService.findPlayerByLowercaseNickname(targetNicknameLowercased);
 
-        this.plugin.getServer().getEventManager().fireAndForget(new ChangePasswordEvent(registeredPlayer, null, oldHash, newPassword, newHash));
-
-        source.sendMessage(serializer.deserialize(MessageFormat.format(this.successful, nickname)));
-      } catch (SQLException e) {
-        source.sendMessage(serializer.deserialize(MessageFormat.format(this.notSuccessful, nickname)));
-        throw new SQLRuntimeException(e);
+      if (registeredPlayer == null) {
+        source.sendMessage(notRegisteredMsg);
+        return;
       }
-    } else {
-      source.sendMessage(this.usage);
+      if (registeredPlayer.getHash().isEmpty() && !currentSettings.MAIN.ONLINE_MODE_NEED_AUTH) {
+        source.sendMessage(
+            currentSerializer.deserialize(
+                MessageFormat.format(
+                    currentSettings.MAIN.STRINGS.PLAYER_IS_PREMIUM_NO_PASS_CHANGE,
+                    targetNickname)));
+        return;
+      }
+
+      final String oldHash = registeredPlayer.getHash();
+      registeredPlayer.setPassword(newPassword); // This handles hashing
+      this.databaseService.updatePlayer(registeredPlayer);
+
+      this.cacheManager.removeAuthUserFromCache(targetNickname); // Invalidate session
+
+      this.server
+          .getPlayer(targetNickname)
+          .ifPresent(player -> player.sendMessage(messageToPlayer));
+
+      this.plugin
+          .getServer()
+          .getEventManager()
+          .fireAndForget(
+              new ChangePasswordEvent(
+                  registeredPlayer, null, oldHash, newPassword, registeredPlayer.getHash()));
+
+      source.sendMessage(successfulMsg);
+
+    } catch (SQLRuntimeException e) {
+      this.logger.error("SQL error forcing password change for {}:", targetNickname, e);
+      source.sendMessage(notSuccessfulMsg);
+    } catch (Exception e) {
+      this.logger.error("Unexpected error forcing password change for {}:", targetNickname, e);
+      source.sendMessage(notSuccessfulMsg);
     }
   }
 
   @Override
   public boolean hasPermission(SimpleCommand.Invocation invocation) {
-    return Settings.IMP.MAIN.COMMAND_PERMISSION_STATE.FORCE_CHANGE_PASSWORD
+    return super.configManager
+        .getSettings()
+        .MAIN
+        .COMMAND_PERMISSION_STATE
+        .FORCE_CHANGE_PASSWORD
         .hasPermission(invocation.source(), "limboauth.admin.forcechangepassword");
   }
 }
