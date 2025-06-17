@@ -66,6 +66,18 @@ dependencies {
     implementation("org.bstats:bstats-velocity:$bstatsVersion")
 
     compileOnly("com.github.spotbugs:spotbugs-annotations:$spotbugsVersion")
+
+    testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")
+    testImplementation("com.google.guava:guava:33.1.0-jre")
+    testImplementation("net.elytrium.commons:config:$elytriumCommonsVersion")
+    testImplementation("org.yaml:snakeyaml:2.2")
+    testImplementation("org.slf4j:slf4j-simple:2.0.12")
+    testImplementation("net.elytrium.commons:kyori:$elytriumCommonsVersion")
+    testImplementation("net.kyori:adventure-api:4.14.0")
+}
+
+test {
+    useJUnitPlatform()
 }
 
 shadowJar {
